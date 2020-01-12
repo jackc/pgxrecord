@@ -274,7 +274,7 @@ func SelectOne(ctx context.Context, db DB, record Selector, options ...pgsql.Sta
 	return nil
 }
 
-// SelectOne selects records from db into collection. It applies options to the SQL statement.
+// SelectAll selects records from db into collection. It applies options to the SQL statement.
 func SelectAll(ctx context.Context, db DB, collection SelectCollection, options ...pgsql.StatementOption) error {
 	stmt := pgsql.NewStatement()
 
