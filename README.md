@@ -1,4 +1,5 @@
 [![](https://godoc.org/github.com/jackc/pgxrecord?status.svg)](https://godoc.org/github.com/jackc/pgxrecord)
+[![Build Status](https://travis-ci.org/jackc/pgxrecord.svg)](https://travis-ci.org/jackc/pgxrecord)
 
 # pgxrecord
 
