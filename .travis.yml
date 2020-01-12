@@ -14,7 +14,6 @@ env:
     - GO111MODULE=on
     - GOPROXY=https://proxy.golang.org
     - GOFLAGS=-mod=readonly
-    - PGDATABASE=travis_ci_test
     - PGUSER=postgres
 
 cache:
@@ -23,9 +22,9 @@ cache:
     - $HOME/gopath/pkg/mod
 
 before_script:
-  - psql -c 'create database travis_ci_test;' -U postgres
+  - createdb travis_ci_test
 
 install: go mod download
 
 script:
-  - go test -v -race
+  - PGDATABASE=travis_ci_test go test -v -race
