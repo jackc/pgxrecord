@@ -415,3 +415,43 @@ func TestPgErrorMapper(t *testing.T) {
 		assert.Equal(t, "mapped error", err.Error())
 	})
 }
+
+func BenchmarkSelectOne(b *testing.B) {
+	withTx(b, func(ctx context.Context, tx pgx.Tx) {
+		widget := &Widget{Name: "sprocket"}
+		err := pgxrecord.Insert(ctx, tx, widget)
+		require.NoError(b, err)
+
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			w := &Widget{}
+			err := pgxrecord.SelectOne(ctx, tx, w, pgsql.Where("id=?", widget.ID))
+			if err != nil {
+				b.Fatal(err)
+			}
+		}
+	})
+}
+
+func BenchmarkSelectOnePgx(b *testing.B) {
+	withTx(b, func(ctx context.Context, tx pgx.Tx) {
+		widget := &Widget{Name: "sprocket"}
+		err := pgxrecord.Insert(ctx, tx, widget)
+		require.NoError(b, err)
+
+		stmt := pgsql.NewStatement()
+		err = stmt.Apply(pgsql.Select("id, widgets"), pgsql.From("widgets"), pgsql.Where("id=?", widget.ID))
+		if err != nil {
+			b.Fatal(err)
+		}
+
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			w := &Widget{}
+			err = tx.QueryRow(ctx, stmt.String(), stmt.Args.Values()...).Scan(&w.ID, &w.Name)
+			if err != nil {
+				b.Fatal(err)
+			}
+		}
+	})
+}
