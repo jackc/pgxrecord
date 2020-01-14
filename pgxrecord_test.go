@@ -62,22 +62,24 @@ func (widget *Widget) SelectStatementOptions() []pgsql.StatementOption {
 	}
 }
 
-func (widget *Widget) SelectScanArgs() (queryArgs []interface{}) {
-	return []interface{}{&widget.ID, &widget.Name}
+func (widget *Widget) SelectScan(rows pgx.Rows) error {
+	return rows.Scan(&widget.ID, &widget.Name)
 }
 
-func (widget *Widget) InsertQuery() (sql string, queryArgs []interface{}, scanArgs []interface{}) {
+func (widget *Widget) InsertQuery() (sql string, queryArgs []interface{}) {
 	sql = "insert into widgets(name) values ($1) returning id"
 	queryArgs = []interface{}{widget.Name}
-	scanArgs = []interface{}{&widget.ID}
-	return sql, queryArgs, scanArgs
+	return sql, queryArgs
 }
 
-func (widget *Widget) UpdateQuery() (sql string, queryArgs []interface{}, scanArgs []interface{}) {
+func (widget *Widget) InsertScan(rows pgx.Rows) error {
+	return rows.Scan(&widget.ID)
+}
+
+func (widget *Widget) UpdateQuery() (sql string, queryArgs []interface{}) {
 	sql = `update widgets set name=$1 where id=$2`
 	queryArgs = []interface{}{widget.Name, widget.ID}
-	scanArgs = nil
-	return sql, queryArgs, scanArgs
+	return sql, queryArgs
 }
 
 func (widget *Widget) DeleteQuery() (sql string, queryArgs []interface{}) {
@@ -133,11 +135,8 @@ func TestInsertCallsBeforeSave(t *testing.T) {
 
 type widgetWithoutInsertReturning Widget
 
-func (widget *widgetWithoutInsertReturning) InsertQuery() (sql string, queryArgs []interface{}, scanArgs []interface{}) {
-	sql = "insert into widgets(name) values ($1) returning id"
-	queryArgs = []interface{}{widget.Name}
-	scanArgs = nil
-	return sql, queryArgs, scanArgs
+func (widget *widgetWithoutInsertReturning) InsertQuery() (sql string, queryArgs []interface{}) {
+	return (*Widget)(widget).InsertQuery()
 }
 
 func TestInsertWithoutReturningScan(t *testing.T) {
@@ -208,11 +207,10 @@ func TestUpdateNotFound(t *testing.T) {
 
 type widgetUpdatesTooMany Widget
 
-func (widget *widgetUpdatesTooMany) UpdateQuery() (sql string, queryArgs []interface{}, scanArgs []interface{}) {
+func (widget *widgetUpdatesTooMany) UpdateQuery() (sql string, queryArgs []interface{}) {
 	sql = `update widgets set name=name`
 	queryArgs = nil
-	scanArgs = nil
-	return sql, queryArgs, scanArgs
+	return sql, queryArgs
 }
 
 func TestUpdateTooMany(t *testing.T) {
@@ -231,11 +229,14 @@ func TestUpdateTooMany(t *testing.T) {
 
 type widgetUpdateWithReturningScan Widget
 
-func (widget *widgetUpdateWithReturningScan) UpdateQuery() (sql string, queryArgs []interface{}, scanArgs []interface{}) {
-	sql = "update widgets set name=$1||$1 where id=$2 returning name"
+func (widget *widgetUpdateWithReturningScan) UpdateQuery() (sql string, queryArgs []interface{}) {
+	sql = `update widgets set name=$1||$1 where id=$2 returning name`
 	queryArgs = []interface{}{widget.Name, widget.ID}
-	scanArgs = []interface{}{&widget.Name}
-	return sql, queryArgs, scanArgs
+	return sql, queryArgs
+}
+
+func (widget *widgetUpdateWithReturningScan) UpdateScan(rows pgx.Rows) error {
+	return rows.Scan(&widget.Name)
 }
 
 func TestUpdateWithReturningScan(t *testing.T) {
@@ -296,6 +297,31 @@ func TestDeleteTooMany(t *testing.T) {
 		err = pgxrecord.Delete(ctx, tx, widget)
 		require.Error(t, err)
 		require.Equal(t, "expected 1 row got 2", err.Error())
+	})
+}
+
+type widgetDeleteWithReturningScan Widget
+
+func (widget *widgetDeleteWithReturningScan) DeleteQuery() (sql string, queryArgs []interface{}) {
+	sql = `delete from widgets where id=$1 returning name`
+	queryArgs = []interface{}{widget.ID}
+	return sql, queryArgs
+}
+
+func (widget *widgetDeleteWithReturningScan) DeleteScan(rows pgx.Rows) error {
+	return rows.Scan(&widget.Name)
+}
+
+func TestDeleteWithReturningScan(t *testing.T) {
+	withTx(t, func(ctx context.Context, tx pgx.Tx) {
+		widget := &Widget{Name: "sprocket"}
+		err := pgxrecord.Insert(ctx, tx, widget)
+		require.NoError(t, err)
+
+		toDelete := &widgetDeleteWithReturningScan{ID: widget.ID}
+		err = pgxrecord.Delete(ctx, tx, toDelete)
+		require.NoError(t, err)
+		assert.Equal(t, widget.Name, toDelete.Name)
 	})
 }
 
