@@ -15,14 +15,17 @@ type DB interface {
 	Query(ctx context.Context, sql string, optionsAndArgs ...interface{}) (pgx.Rows, error)
 }
 
-type Normalizer interface {
-	// Normalize normalizes the data in a record. e.g. Strip spaces from strings.
-	Normalize(context.Context)
-}
+type Op int8
 
-type Validator interface {
-	// Validate returns an error if the record is not valid.
-	Validate(context.Context) error
+const (
+	unspecifiedOp Op = iota
+	InsertOp
+	UpdateOp
+)
+
+type BeforeSaver interface {
+	// BeforeSave returns an error if the operation should be canceled. op is either InsertOp or UpdateOp.
+	BeforeSave(ctx context.Context, op Op) error
 }
 
 type Inserter interface {
@@ -112,6 +115,7 @@ func Insert(ctx context.Context, db DB, record Inserter) error {
 			}
 			return nil
 		},
+		InsertOp,
 	)
 }
 
@@ -130,6 +134,7 @@ func Update(ctx context.Context, db DB, record Updater) error {
 			}
 			return nil
 		},
+		UpdateOp,
 	)
 }
 
@@ -142,13 +147,10 @@ func insertOrUpdate(
 	record interface{},
 	buildQuery buildInsertOrUpdateQueryFunc,
 	checkCommandTagType checkCommandTagTypeFunc,
+	op Op,
 ) error {
-	if n, ok := record.(Normalizer); ok {
-		n.Normalize(ctx)
-	}
-
-	if v, ok := record.(Validator); ok {
-		err := v.Validate(ctx)
+	if bs, ok := record.(BeforeSaver); ok {
+		err := bs.BeforeSave(ctx, op)
 		if err != nil {
 			return err
 		}

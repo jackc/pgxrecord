@@ -47,11 +47,9 @@ type Widget struct {
 	Name string
 }
 
-func (widget *Widget) Normalize(context.Context) {
+func (widget *Widget) BeforeSave(_ context.Context, op pgxrecord.Op) error {
 	widget.Name = normalize.TextField(widget.Name)
-}
 
-func (widget *Widget) Validate(context.Context) error {
 	v := &validate.Validator{}
 	v.Presence("name", widget.Name)
 	return v.Errors()
@@ -120,23 +118,7 @@ func TestInsertInserts(t *testing.T) {
 	})
 }
 
-func TestInsertNormalizes(t *testing.T) {
-	withTx(t, func(ctx context.Context, tx pgx.Tx) {
-		widget := &Widget{Name: "   sprocket    "}
-		err := pgxrecord.Insert(ctx, tx, widget)
-		require.NoError(t, err)
-		assert.Equal(t, "sprocket", widget.Name)
-
-		readBack := &Widget{}
-		err = pgxrecord.SelectOne(ctx, tx, readBack, pgsql.Where("name=?", widget.Name))
-		require.NoError(t, err)
-
-		assert.Equal(t, widget.ID, readBack.ID)
-		assert.Equal(t, widget.Name, readBack.Name)
-	})
-}
-
-func TestInsertValidates(t *testing.T) {
+func TestInsertCallsBeforeSave(t *testing.T) {
 	withTx(t, func(ctx context.Context, tx pgx.Tx) {
 		widget := &Widget{}
 		err := pgxrecord.Insert(ctx, tx, widget)
@@ -197,26 +179,7 @@ func TestUpdateUpdates(t *testing.T) {
 	})
 }
 
-func TestUpdateNormalizes(t *testing.T) {
-	withTx(t, func(ctx context.Context, tx pgx.Tx) {
-		widget := &Widget{Name: "sprocket"}
-		err := pgxrecord.Insert(ctx, tx, widget)
-		require.NoError(t, err)
-
-		widget.Name = "   device   "
-		err = pgxrecord.Update(ctx, tx, widget)
-		require.NoError(t, err)
-
-		readBack := &Widget{}
-		err = pgxrecord.SelectOne(ctx, tx, readBack, pgsql.Where("name=?", widget.Name))
-		require.NoError(t, err)
-
-		assert.Equal(t, widget.ID, readBack.ID)
-		assert.Equal(t, widget.Name, readBack.Name)
-	})
-}
-
-func TestUpdateValidates(t *testing.T) {
+func TestUpdateCallsBeforeSave(t *testing.T) {
 	withTx(t, func(ctx context.Context, tx pgx.Tx) {
 		widget := &Widget{Name: "sprocket"}
 		err := pgxrecord.Insert(ctx, tx, widget)
