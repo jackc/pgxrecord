@@ -10,7 +10,7 @@ import (
 	"github.com/jackc/pgx/v4"
 )
 
-type DB interface {
+type Queryer interface {
 	Query(ctx context.Context, sql string, optionsAndArgs ...interface{}) (pgx.Rows, error)
 }
 
@@ -108,7 +108,7 @@ func NotFound(err error) bool {
 
 // Insert inserts record into db. If record implements BeforeSaver then BeforeSave will be called. If an error is
 // returned the Insert is aborted.
-func Insert(ctx context.Context, db DB, record Inserter) error {
+func Insert(ctx context.Context, db Queryer, record Inserter) error {
 	if bs, ok := record.(BeforeSaver); ok {
 		err := bs.BeforeSave(InsertOp)
 		if err != nil {
@@ -149,7 +149,7 @@ func Insert(ctx context.Context, db DB, record Inserter) error {
 
 // Update updates record in db. If record implements BeforeSaver then BeforeSave will be called. If an error is
 // returned the Update is aborted. If the update query does not affect exactly one record an error will be returned.
-func Update(ctx context.Context, db DB, record Updater) error {
+func Update(ctx context.Context, db Queryer, record Updater) error {
 	if bs, ok := record.(BeforeSaver); ok {
 		err := bs.BeforeSave(UpdateOp)
 		if err != nil {
@@ -189,7 +189,7 @@ func Update(ctx context.Context, db DB, record Updater) error {
 }
 
 // Delete deletes record in db. If the delete query does affect exactly one record an error will be returned.
-func Delete(ctx context.Context, db DB, record Deleter) error {
+func Delete(ctx context.Context, db Queryer, record Deleter) error {
 	sql, queryArgs := record.DeleteQuery()
 
 	rows, err := db.Query(ctx, sql, queryArgs...)
@@ -224,7 +224,7 @@ func Delete(ctx context.Context, db DB, record Deleter) error {
 // SelectOne selects a single record from db into record. It applies options to the SQL statement. An error will be
 // returned if no rows are found. Check for this case with the NotFound function. If multiple rows are selected an
 // error will be returned.
-func SelectOne(ctx context.Context, db DB, record Selector, options ...pgsql.StatementOption) error {
+func SelectOne(ctx context.Context, db Queryer, record Selector, options ...pgsql.StatementOption) error {
 	stmt := pgsql.NewStatement()
 
 	recordOptions := record.SelectStatementOptions()
@@ -270,7 +270,7 @@ func SelectOne(ctx context.Context, db DB, record Selector, options ...pgsql.Sta
 }
 
 // SelectAll selects records from db into collection. It applies options to the SQL statement.
-func SelectAll(ctx context.Context, db DB, collection SelectCollection, options ...pgsql.StatementOption) error {
+func SelectAll(ctx context.Context, db Queryer, collection SelectCollection, options ...pgsql.StatementOption) error {
 	stmt := pgsql.NewStatement()
 
 	record := collection.Add()
