@@ -47,7 +47,7 @@ type Widget struct {
 	Name string
 }
 
-func (widget *Widget) BeforeSave(_ context.Context, op pgxrecord.Op) error {
+func (widget *Widget) BeforeSave(op pgxrecord.Op) error {
 	widget.Name = normalize.TextField(widget.Name)
 
 	v := &validate.Validator{}
@@ -55,38 +55,38 @@ func (widget *Widget) BeforeSave(_ context.Context, op pgxrecord.Op) error {
 	return v.Errors()
 }
 
-func (widget *Widget) SelectStatementOptions(context.Context) []pgsql.StatementOption {
+func (widget *Widget) SelectStatementOptions() []pgsql.StatementOption {
 	return []pgsql.StatementOption{
 		pgsql.Select("widgets.id, widgets.name"),
 		pgsql.From("widgets"),
 	}
 }
 
-func (widget *Widget) SelectScanArgs(context.Context) (queryArgs []interface{}) {
+func (widget *Widget) SelectScanArgs() (queryArgs []interface{}) {
 	return []interface{}{&widget.ID, &widget.Name}
 }
 
-func (widget *Widget) InsertQuery(context.Context) (sql string, queryArgs []interface{}, scanArgs []interface{}) {
+func (widget *Widget) InsertQuery() (sql string, queryArgs []interface{}, scanArgs []interface{}) {
 	sql = "insert into widgets(name) values ($1) returning id"
 	queryArgs = []interface{}{widget.Name}
 	scanArgs = []interface{}{&widget.ID}
 	return sql, queryArgs, scanArgs
 }
 
-func (widget *Widget) UpdateQuery(context.Context) (sql string, queryArgs []interface{}, scanArgs []interface{}) {
+func (widget *Widget) UpdateQuery() (sql string, queryArgs []interface{}, scanArgs []interface{}) {
 	sql = `update widgets set name=$1 where id=$2`
 	queryArgs = []interface{}{widget.Name, widget.ID}
 	scanArgs = nil
 	return sql, queryArgs, scanArgs
 }
 
-func (widget *Widget) DeleteQuery(context.Context) (sql string, queryArgs []interface{}) {
+func (widget *Widget) DeleteQuery() (sql string, queryArgs []interface{}) {
 	sql = `delete from widgets where id=$1`
 	queryArgs = []interface{}{widget.ID}
 	return sql, queryArgs
 }
 
-func (widget *Widget) MapPgError(context.Context, *pgconn.PgError) error {
+func (widget *Widget) MapPgError(*pgconn.PgError) error {
 	return errors.New("mapped error")
 }
 
@@ -133,7 +133,7 @@ func TestInsertCallsBeforeSave(t *testing.T) {
 
 type widgetWithoutInsertReturning Widget
 
-func (widget *widgetWithoutInsertReturning) InsertQuery(context.Context) (sql string, queryArgs []interface{}, scanArgs []interface{}) {
+func (widget *widgetWithoutInsertReturning) InsertQuery() (sql string, queryArgs []interface{}, scanArgs []interface{}) {
 	sql = "insert into widgets(name) values ($1) returning id"
 	queryArgs = []interface{}{widget.Name}
 	scanArgs = nil
@@ -208,7 +208,7 @@ func TestUpdateNotFound(t *testing.T) {
 
 type widgetUpdatesTooMany Widget
 
-func (widget *widgetUpdatesTooMany) UpdateQuery(context.Context) (sql string, queryArgs []interface{}, scanArgs []interface{}) {
+func (widget *widgetUpdatesTooMany) UpdateQuery() (sql string, queryArgs []interface{}, scanArgs []interface{}) {
 	sql = `update widgets set name=name`
 	queryArgs = nil
 	scanArgs = nil
@@ -231,7 +231,7 @@ func TestUpdateTooMany(t *testing.T) {
 
 type widgetUpdateWithReturningScan Widget
 
-func (widget *widgetUpdateWithReturningScan) UpdateQuery(context.Context) (sql string, queryArgs []interface{}, scanArgs []interface{}) {
+func (widget *widgetUpdateWithReturningScan) UpdateQuery() (sql string, queryArgs []interface{}, scanArgs []interface{}) {
 	sql = "update widgets set name=$1||$1 where id=$2 returning name"
 	queryArgs = []interface{}{widget.Name, widget.ID}
 	scanArgs = []interface{}{&widget.Name}
@@ -279,7 +279,7 @@ func TestDeleteNotFound(t *testing.T) {
 
 type widgetDeletesTooMany Widget
 
-func (widget *widgetDeletesTooMany) DeleteQuery(context.Context) (sql string, queryArgs []interface{}) {
+func (widget *widgetDeletesTooMany) DeleteQuery() (sql string, queryArgs []interface{}) {
 	sql = `delete from widgets`
 	queryArgs = nil
 	return sql, queryArgs

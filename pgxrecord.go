@@ -25,30 +25,30 @@ const (
 
 type BeforeSaver interface {
 	// BeforeSave returns an error if the operation should be canceled. op is either InsertOp or UpdateOp.
-	BeforeSave(ctx context.Context, op Op) error
+	BeforeSave(op Op) error
 }
 
 type Inserter interface {
 	// InsertQuery returns the sql, query arguments, and optionally arguments to scan (for a returning clause) used to insert the record.
-	InsertQuery(context.Context) (sql string, queryArgs []interface{}, scanArgs []interface{})
+	InsertQuery() (sql string, queryArgs []interface{}, scanArgs []interface{})
 }
 
 type Updater interface {
 	// UpdateQuery returns the sql, query arguments, and optionally arguments to scan (for a returning clause) used to update the record.
-	UpdateQuery(context.Context) (sql string, queryArgs []interface{}, scanArgs []interface{})
+	UpdateQuery() (sql string, queryArgs []interface{}, scanArgs []interface{})
 }
 
 type Deleter interface {
 	// UpdateQuery returns the sql and query arguments used to delete the record.
-	DeleteQuery(context.Context) (sql string, queryArgs []interface{})
+	DeleteQuery() (sql string, queryArgs []interface{})
 }
 
 type Selector interface {
 	// SelectStatementOptions returns statement options to build a query that selects a record or records.
-	SelectStatementOptions(context.Context) []pgsql.StatementOption
+	SelectStatementOptions() []pgsql.StatementOption
 
 	// SelectScanArgs returns the arguments to scan from the record.
-	SelectScanArgs(context.Context) []interface{}
+	SelectScanArgs() []interface{}
 }
 
 type SelectCollection interface {
@@ -59,13 +59,13 @@ type SelectCollection interface {
 type PgErrorMapper interface {
 	// MapPgError converts a pgconn.PgError to another type of error. For example, a unique constraint violation may be
 	// converted to an application specific validation error.
-	MapPgError(context.Context, *pgconn.PgError) error
+	MapPgError(*pgconn.PgError) error
 }
 
-func tryMapPgError(ctx context.Context, record interface{}, err error) error {
+func tryMapPgError(record interface{}, err error) error {
 	if mapper, ok := record.(PgErrorMapper); ok {
 		if pgErr, ok := err.(*pgconn.PgError); ok {
-			return mapper.MapPgError(ctx, pgErr)
+			return mapper.MapPgError(pgErr)
 		}
 	}
 
@@ -108,7 +108,7 @@ func Insert(ctx context.Context, db DB, record Inserter) error {
 		ctx,
 		db,
 		record,
-		func() (string, []interface{}, []interface{}) { return record.InsertQuery(ctx) },
+		func() (string, []interface{}, []interface{}) { return record.InsertQuery() },
 		func(ct pgconn.CommandTag) error {
 			if !ct.Insert() {
 				return &badStatementTypeError{expected: "INSERT", actual: ct.String()}
@@ -127,7 +127,7 @@ func Update(ctx context.Context, db DB, record Updater) error {
 		ctx,
 		db,
 		record,
-		func() (string, []interface{}, []interface{}) { return record.UpdateQuery(ctx) },
+		func() (string, []interface{}, []interface{}) { return record.UpdateQuery() },
 		func(ct pgconn.CommandTag) error {
 			if !ct.Update() {
 				return &badStatementTypeError{expected: "UPDATE", actual: ct.String()}
@@ -150,7 +150,7 @@ func insertOrUpdate(
 	op Op,
 ) error {
 	if bs, ok := record.(BeforeSaver); ok {
-		err := bs.BeforeSave(ctx, op)
+		err := bs.BeforeSave(op)
 		if err != nil {
 			return err
 		}
@@ -166,7 +166,7 @@ func insertOrUpdate(
 		ct, err = db.Exec(ctx, sql, queryArgs...)
 	}
 	if err != nil {
-		return tryMapPgError(ctx, record, err)
+		return tryMapPgError(record, err)
 	}
 
 	err = checkCommandTagType(ct)
@@ -205,11 +205,11 @@ func insertOrUpdateWithScan(ctx context.Context, db DB, sql string, queryArgs []
 
 // Delete deletes record in db. If the delete query does not delete exactly one record an error will be returned.
 func Delete(ctx context.Context, db DB, record Deleter) error {
-	sql, queryArgs := record.DeleteQuery(ctx)
+	sql, queryArgs := record.DeleteQuery()
 
 	ct, err := db.Exec(ctx, sql, queryArgs...)
 	if err != nil {
-		return tryMapPgError(ctx, record, err)
+		return tryMapPgError(record, err)
 	}
 
 	if !ct.Delete() {
@@ -233,7 +233,7 @@ func Delete(ctx context.Context, db DB, record Deleter) error {
 func SelectOne(ctx context.Context, db DB, record Selector, options ...pgsql.StatementOption) error {
 	stmt := pgsql.NewStatement()
 
-	recordOptions := record.SelectStatementOptions(ctx)
+	recordOptions := record.SelectStatementOptions()
 	err := stmt.Apply(recordOptions...)
 	if err != nil {
 		return err
@@ -246,13 +246,13 @@ func SelectOne(ctx context.Context, db DB, record Selector, options ...pgsql.Sta
 
 	rows, err := db.Query(ctx, stmt.String(), stmt.Args.Values()...)
 	if err != nil {
-		return tryMapPgError(ctx, record, err)
+		return tryMapPgError(record, err)
 	}
 
 	rowCount := int64(0)
 	for rows.Next() {
 		if rowCount == 0 {
-			scanArgs := record.SelectScanArgs(ctx)
+			scanArgs := record.SelectScanArgs()
 			err := rows.Scan(scanArgs...)
 			if err != nil {
 				return err
@@ -262,7 +262,7 @@ func SelectOne(ctx context.Context, db DB, record Selector, options ...pgsql.Sta
 		rowCount++
 	}
 	if rows.Err() != nil {
-		return tryMapPgError(ctx, record, rows.Err())
+		return tryMapPgError(record, rows.Err())
 	}
 
 	if rowCount == 0 {
@@ -281,7 +281,7 @@ func SelectAll(ctx context.Context, db DB, collection SelectCollection, options 
 	stmt := pgsql.NewStatement()
 
 	record := collection.Add()
-	recordOptions := record.SelectStatementOptions(ctx)
+	recordOptions := record.SelectStatementOptions()
 	err := stmt.Apply(recordOptions...)
 	if err != nil {
 		return err
@@ -294,7 +294,7 @@ func SelectAll(ctx context.Context, db DB, collection SelectCollection, options 
 
 	rows, err := db.Query(ctx, stmt.String(), stmt.Args.Values()...)
 	if err != nil {
-		return tryMapPgError(ctx, record, err)
+		return tryMapPgError(record, err)
 	}
 
 	rowCount := 0
@@ -302,7 +302,7 @@ func SelectAll(ctx context.Context, db DB, collection SelectCollection, options 
 		if rowCount > 0 {
 			record = collection.Add()
 		}
-		scanArgs := record.SelectScanArgs(ctx)
+		scanArgs := record.SelectScanArgs()
 		err := rows.Scan(scanArgs...)
 		if err != nil {
 			return err
@@ -311,7 +311,7 @@ func SelectAll(ctx context.Context, db DB, collection SelectCollection, options 
 		rowCount++
 	}
 	if rows.Err() != nil {
-		return tryMapPgError(ctx, record, rows.Err())
+		return tryMapPgError(record, rows.Err())
 	}
 
 	return nil
