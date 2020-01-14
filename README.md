@@ -7,8 +7,6 @@ Package pgxrecord is a tiny framework for CRUD operations and data mapping.
 
 It is not an ORM. It does not use reflection and it does not use code generation.
 
-It includes hooks for data normalization and validation. It also includes a hook to map database errors such as uniqueness violations to an application defined error.
-
 ## Example Usage
 
 Select all records matching conditions.
@@ -59,35 +57,41 @@ type Widget struct {
 	Name string
 }
 
-func (widget *Widget) SelectStatementOptions(context.Context) []pgsql.StatementOption {
+func (widget *Widget) SelectStatementOptions() []pgsql.StatementOption {
 	return []pgsql.StatementOption{
 		pgsql.Select("widgets.id, widgets.name"),
 		pgsql.From("widgets"),
 	}
 }
 
-func (widget *Widget) SelectScanArgs(context.Context) (queryArgs []interface{}) {
-	return []interface{}{&widget.ID, &widget.Name}
+func (widget *Widget) SelectScan(rows pgx.Rows) error {
+	return rows.Scan(&widget.ID, &widget.Name)
 }
 
-func (widget *Widget) InsertQuery(context.Context) (sql string, queryArgs []interface{}, scanArgs []interface{}) {
+func (widget *Widget) InsertQuery() (sql string, queryArgs []interface{}) {
 	sql = "insert into widgets(name) values ($1) returning id"
 	queryArgs = []interface{}{widget.Name}
-	scanArgs = []interface{}{&widget.ID}
-	return sql, queryArgs, scanArgs
+	return sql, queryArgs
 }
 
-func (widget *Widget) UpdateQuery(context.Context) (sql string, queryArgs []interface{}, scanArgs []interface{}) {
+func (widget *Widget) InsertScan(rows pgx.Rows) error {
+	return rows.Scan(&widget.ID)
+}
+
+func (widget *Widget) UpdateQuery() (sql string, queryArgs []interface{}) {
 	sql = `update widgets set name=$1 where id=$2`
 	queryArgs = []interface{}{widget.Name, widget.ID}
-	scanArgs = nil
-	return sql, queryArgs, scanArgs
+	return sql, queryArgs
 }
 
-func (widget *Widget) DeleteQuery(context.Context) (sql string, queryArgs []interface{}) {
+func (widget *Widget) DeleteQuery() (sql string, queryArgs []interface{}) {
 	sql = `delete from widgets where id=$1`
 	queryArgs = []interface{}{widget.ID}
 	return sql, queryArgs
+}
+
+func (widget *Widget) MapPgError(*pgconn.PgError) error {
+	return errors.New("mapped error")
 }
 
 type WidgetCollection []*Widget

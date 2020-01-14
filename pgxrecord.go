@@ -71,7 +71,7 @@ type SelectCollection interface {
 }
 
 type PgErrorMapper interface {
-	// MapPgError converts a pgconn.PgError to another type of error. For example, a unique constraint violation may be
+	// MapPgError converts a *pgconn.PgError to another type of error. For example, a unique constraint violation may be
 	// converted to an application specific validation error.
 	MapPgError(*pgconn.PgError) error
 }
@@ -117,34 +117,12 @@ func Insert(ctx context.Context, db Queryer, record Inserter) error {
 	}
 
 	sql, queryArgs := record.InsertQuery()
-
-	rows, err := db.Query(ctx, sql, queryArgs...)
-	if err != nil {
-		return err
+	var f scanFunc
+	if record, ok := record.(InsertScanner); ok {
+		f = func(rows pgx.Rows) error { return record.InsertScan(rows) }
 	}
 
-	for rows.Next() {
-		if record, ok := record.(InsertScanner); ok {
-			err = record.InsertScan(rows)
-			if err != nil {
-				rows.Close()
-				return tryMapPgError(record, err)
-			}
-		}
-	}
-	if rows.Err() != nil {
-		return tryMapPgError(record, rows.Err())
-	}
-
-	rowsAffected := rows.CommandTag().RowsAffected()
-	if rowsAffected == 0 {
-		return &notFoundError{}
-	}
-	if rowsAffected > 1 {
-		return &multipleRowsError{rowCount: rowsAffected}
-	}
-
-	return nil
+	return queryOne(ctx, db, record, sql, queryArgs, f)
 }
 
 // Update updates record in db. If record implements BeforeSaver then BeforeSave will be called. If an error is
@@ -159,66 +137,24 @@ func Update(ctx context.Context, db Queryer, record Updater) error {
 
 	sql, queryArgs := record.UpdateQuery()
 
-	rows, err := db.Query(ctx, sql, queryArgs...)
-	if err != nil {
-		return err
+	var f scanFunc
+	if record, ok := record.(UpdateScanner); ok {
+		f = func(rows pgx.Rows) error { return record.UpdateScan(rows) }
 	}
 
-	for rows.Next() {
-		if record, ok := record.(UpdateScanner); ok {
-			err = record.UpdateScan(rows)
-			if err != nil {
-				rows.Close()
-				return tryMapPgError(record, err)
-			}
-		}
-	}
-	if rows.Err() != nil {
-		return tryMapPgError(record, rows.Err())
-	}
-
-	rowsAffected := rows.CommandTag().RowsAffected()
-	if rowsAffected == 0 {
-		return &notFoundError{}
-	}
-	if rowsAffected > 1 {
-		return &multipleRowsError{rowCount: rowsAffected}
-	}
-
-	return nil
+	return queryOne(ctx, db, record, sql, queryArgs, f)
 }
 
 // Delete deletes record in db. If the delete query does affect exactly one record an error will be returned.
 func Delete(ctx context.Context, db Queryer, record Deleter) error {
 	sql, queryArgs := record.DeleteQuery()
 
-	rows, err := db.Query(ctx, sql, queryArgs...)
-	if err != nil {
-		return err
+	var f scanFunc
+	if record, ok := record.(DeleteScanner); ok {
+		f = func(rows pgx.Rows) error { return record.DeleteScan(rows) }
 	}
 
-	for rows.Next() {
-		if record, ok := record.(DeleteScanner); ok {
-			err = record.DeleteScan(rows)
-			if err != nil {
-				rows.Close()
-				return tryMapPgError(record, err)
-			}
-		}
-	}
-	if rows.Err() != nil {
-		return tryMapPgError(record, rows.Err())
-	}
-
-	rowsAffected := rows.CommandTag().RowsAffected()
-	if rowsAffected == 0 {
-		return &notFoundError{}
-	}
-	if rowsAffected > 1 {
-		return &multipleRowsError{rowCount: rowsAffected}
-	}
-
-	return nil
+	return queryOne(ctx, db, record, sql, queryArgs, f)
 }
 
 // SelectOne selects a single record from db into record. It applies options to the SQL statement. An error will be
@@ -238,32 +174,35 @@ func SelectOne(ctx context.Context, db Queryer, record Selector, options ...pgsq
 		return err
 	}
 
-	rows, err := db.Query(ctx, stmt.String(), stmt.Args.Values()...)
+	return queryOne(ctx, db, record, stmt.String(), stmt.Args.Values(), record.SelectScan)
+}
+
+type scanFunc func(rows pgx.Rows) error
+
+func queryOne(ctx context.Context, db Queryer, record interface{}, sql string, queryArgs []interface{}, scan scanFunc) error {
+	rows, err := db.Query(ctx, sql, queryArgs...)
 	if err != nil {
-		return tryMapPgError(record, err)
+		return err
 	}
 
-	rowCount := int64(0)
-	for rows.Next() {
-		if rowCount == 0 {
-			err := record.SelectScan(rows)
-			if err != nil {
-				return err
-			}
+	if rows.Next() && scan != nil {
+		err = scan(rows)
+		if err != nil {
+			rows.Close()
+			return tryMapPgError(record, err)
 		}
-
-		rowCount++
 	}
+	rows.Close()
 	if rows.Err() != nil {
 		return tryMapPgError(record, rows.Err())
 	}
 
-	if rowCount == 0 {
+	rowsAffected := rows.CommandTag().RowsAffected()
+	if rowsAffected == 0 {
 		return &notFoundError{}
 	}
-
-	if rowCount > 1 {
-		return &multipleRowsError{rowCount: rowCount}
+	if rowsAffected > 1 {
+		return &multipleRowsError{rowCount: rowsAffected}
 	}
 
 	return nil
