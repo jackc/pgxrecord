@@ -94,10 +94,12 @@ func (widget *Widget) MapPgError(*pgconn.PgError) error {
 
 type WidgetCollection []*Widget
 
-func (c *WidgetCollection) Add() pgxrecord.Selector {
-	widget := &Widget{}
-	*c = append(*c, widget)
-	return widget
+func (c *WidgetCollection) NewRecord() pgxrecord.Selector {
+	return &Widget{}
+}
+
+func (c *WidgetCollection) Append(s pgxrecord.Selector) {
+	*c = append(*c, s.(*Widget))
 }
 
 func TestInsertInserts(t *testing.T) {
@@ -392,6 +394,22 @@ func TestSelectAllOptions(t *testing.T) {
 		require.NoError(t, err)
 
 		assert.Len(t, widgets, 1)
+	})
+}
+
+func TestSelectAllWhenNoResults(t *testing.T) {
+	withTx(t, func(ctx context.Context, tx pgx.Tx) {
+		err := pgxrecord.Insert(ctx, tx, &Widget{Name: "sprocket"})
+		require.NoError(t, err)
+		err = pgxrecord.Insert(ctx, tx, &Widget{Name: "device"})
+		require.NoError(t, err)
+
+		var widgets WidgetCollection
+
+		err = pgxrecord.SelectAll(ctx, tx, &widgets, pgsql.Where("name=?", "invalid"))
+		require.NoError(t, err)
+
+		assert.Len(t, widgets, 0)
 	})
 }
 

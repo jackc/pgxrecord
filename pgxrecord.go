@@ -66,8 +66,11 @@ type Selector interface {
 }
 
 type SelectCollection interface {
-	// Add adds a Selector to the collection and returns it.
-	Add() Selector
+	// NewRecord allocates and returns a new record that can be appended to this collection.
+	NewRecord() Selector
+
+	// Append appends record to the collection.
+	Append(record Selector)
 }
 
 type PgErrorMapper interface {
@@ -212,7 +215,7 @@ func queryOne(ctx context.Context, db Queryer, record interface{}, sql string, q
 func SelectAll(ctx context.Context, db Queryer, collection SelectCollection, options ...pgsql.StatementOption) error {
 	stmt := pgsql.NewStatement()
 
-	record := collection.Add()
+	record := collection.NewRecord()
 	recordOptions := record.SelectStatementOptions()
 	err := stmt.Apply(recordOptions...)
 	if err != nil {
@@ -232,13 +235,14 @@ func SelectAll(ctx context.Context, db Queryer, collection SelectCollection, opt
 	rowCount := 0
 	for rows.Next() {
 		if rowCount > 0 {
-			record = collection.Add()
+			record = collection.NewRecord()
 		}
 		err := record.SelectScan(rows)
 		if err != nil {
 			return err
 		}
 
+		collection.Append(record)
 		rowCount++
 	}
 	if rows.Err() != nil {

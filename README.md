@@ -90,16 +90,14 @@ func (widget *Widget) DeleteQuery() (sql string, queryArgs []interface{}) {
 	return sql, queryArgs
 }
 
-func (widget *Widget) MapPgError(*pgconn.PgError) error {
-	return errors.New("mapped error")
-}
-
 type WidgetCollection []*Widget
 
-func (c *WidgetCollection) Add() pgxrecord.Selector {
-	widget := &Widget{}
-	*c = append(*c, widget)
-	return widget
+func (c *WidgetCollection) NewRecord() pgxrecord.Selector {
+	return &Widget{}
+}
+
+func (c *WidgetCollection) Append(s pgxrecord.Selector) {
+	*c = append(*c, s.(*Widget))
 }
 ```
 
