@@ -1,0 +1,109 @@
+{{- $G := . -}}
+package {{ .PackageName }}
+
+import (
+	"github.com/jackc/pgsql"
+	"github.com/jackc/pgx/v4"
+	"github.com/jackc/pgxrecord"
+	pgtypeuuid "github.com/jackc/pgtype/ext/gofrs-uuid"
+	"github.com/gofrs/uuid"
+	shopspring "github.com/jackc/pgtype/ext/shopspring-numeric"
+	"github.com/shopspring/decimal"
+)
+
+type {{ .StructName }} struct {
+{{ range .Columns }}	{{ .FieldName }} {{ .FieldType }}
+{{ end }}}
+
+func ({{ .ReceiverName }} *{{ .StructName }}) InsertQuery() (sql string, queryArgs []interface{}) {
+	sql = `insert into {{ .TableName }}(
+{{ range $i, $c := .InsertColumns }}{{ if gt $i 0 }},
+{{ end }}  {{ .ColumnName }}{{ end }}
+) values (
+{{ range $i, $c := .InsertColumns }}{{ if gt $i 0 }},
+{{ end }}  ${{ add $i 1 }}{{ end }}
+){{ if .InsertReturningColumns }}
+returning
+{{ range $i, $c := .InsertReturningColumns }}{{ if gt $i 0 }},
+{{ end }}  {{ .ColumnName }}{{ end }}
+{{- end -}}
+`
+
+	queryArgs = []interface{}{
+		{{ range .InsertColumns -}}
+		{{ $G.ReceiverName }}.{{ .FieldName }},
+		{{ end }}}
+
+	return sql, queryArgs
+}
+
+{{ if .InsertReturningColumns }}
+func ({{ .ReceiverName }} *{{ .StructName }}) InsertScan(rows pgx.Rows) error {
+	return rows.Scan(
+		{{ range .InsertReturningColumns -}}
+		&{{ $G.ReceiverName }}.{{ .FieldName }},
+		{{ end -}}
+	)
+}
+{{ end }}
+
+{{ if and .PrimaryKeyColumns .UpdateColumns }}
+func ({{ .ReceiverName }} *{{ .StructName }}) UpdateQuery() (sql string, queryArgs []interface{}) {
+	sql = `update {{ .TableName }}
+set
+{{ range $i, $c := .UpdateColumns }}{{ if gt $i 0 }},
+{{ end }}  {{ .ColumnName }}=${{ add $i 1 }}{{ end }}
+where
+{{ range $i, $c := .PrimaryKeyColumns }}{{ if gt $i 0 }},
+{{ end }}  {{ .ColumnName }}=${{ len $G.UpdateColumns | add $i | add 1 }}{{ end }}`
+
+	queryArgs = []interface{}{
+		{{ range .UpdateColumns -}}
+		{{ $G.ReceiverName }}.{{ .FieldName }},
+		{{ end -}}
+		{{ range .PrimaryKeyColumns -}}
+		{{ $G.ReceiverName }}.{{ .FieldName }},
+		{{ end }}}
+
+	return sql, queryArgs
+}
+{{ end }}
+
+func ({{ .ReceiverName }} *{{ .StructName }}) DeleteQuery() (sql string, queryArgs []interface{}) {
+	sql = `delete from {{ .TableName }}
+where
+{{ range $i, $c := .PrimaryKeyColumns }}{{ if gt $i 0 }},
+{{ end }}  {{ .ColumnName }}=${{ add $i 1 }}{{ end }}`
+
+	queryArgs = []interface{}{
+		{{ range .PrimaryKeyColumns -}}
+		{{ $G.ReceiverName }}.{{ .FieldName }},
+		{{ end }}}
+
+	return sql, queryArgs
+}
+
+func ({{ .ReceiverName }} *{{ .StructName }}) SelectStatementOptions() []pgsql.StatementOption {
+	return []pgsql.StatementOption{
+		pgsql.Select(`{{ range $i, $c := .SelectColumns }}{{ if gt $i 0 }},
+  {{ end }}{{ .ColumnName }}{{ end }}`),
+		pgsql.From(`{{ .TableName }}`),
+	}
+}
+
+func ({{ .ReceiverName }} *{{ .StructName }}) SelectScan(rows pgx.Rows) error {
+	return rows.Scan(
+		{{ range .SelectColumns -}}
+		&{{ $G.ReceiverName }}.{{ .FieldName }},
+		{{ end }})
+}
+
+type {{ .StructName }}Collection []*{{ .StructName }}
+
+func (c *{{ .StructName }}Collection) NewRecord() pgxrecord.Selector {
+	return &{{ .StructName }}{}
+}
+
+func (c *{{ .StructName }}Collection) Append(s pgxrecord.Selector) {
+	*c = append(*c, s.(*{{ .StructName }}))
+}
