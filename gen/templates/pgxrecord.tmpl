@@ -31,7 +31,11 @@ returning
 
 	queryArgs = []interface{}{
 		{{ range .InsertColumns -}}
-		{{ $G.ReceiverName }}.{{ .FieldName }},
+		{{ if .ConvertType -}}
+			({{ .ConvertType }})(
+		{{- end -}}
+		{{ $G.ReceiverName }}.{{ .FieldName }}
+		{{- if .ConvertType -}}){{- end }},
 		{{ end }}}
 
 	return sql, queryArgs
@@ -41,7 +45,11 @@ returning
 func ({{ .ReceiverName }} *{{ .StructName }}) InsertScan(rows pgx.Rows) error {
 	return rows.Scan(
 		{{ range .InsertReturningColumns -}}
-		&{{ $G.ReceiverName }}.{{ .FieldName }},
+		{{ if .ConvertType -}}
+			(*{{ .ConvertType }})(
+		{{- end -}}
+		&{{ $G.ReceiverName }}.{{ .FieldName }}
+		{{- if .ConvertType -}}){{- end }},
 		{{ end -}}
 	)
 }
@@ -59,10 +67,18 @@ where
 
 	queryArgs = []interface{}{
 		{{ range .UpdateColumns -}}
-		{{ $G.ReceiverName }}.{{ .FieldName }},
+		{{ if .ConvertType -}}
+			({{ .ConvertType }})(
+		{{- end -}}
+		{{ $G.ReceiverName }}.{{ .FieldName }}
+		{{- if .ConvertType -}}){{- end }},
 		{{ end -}}
 		{{ range .PrimaryKeyColumns -}}
-		{{ $G.ReceiverName }}.{{ .FieldName }},
+		{{ if .ConvertType -}}
+			({{ .ConvertType }})(
+		{{- end -}}
+		{{ $G.ReceiverName }}.{{ .FieldName }}
+		{{- if .ConvertType -}}){{- end }},
 		{{ end }}}
 
 	return sql, queryArgs
@@ -77,7 +93,11 @@ where
 
 	queryArgs = []interface{}{
 		{{ range .PrimaryKeyColumns -}}
-		{{ $G.ReceiverName }}.{{ .FieldName }},
+		{{ if .ConvertType -}}
+			({{ .ConvertType }})(
+		{{- end -}}
+		{{ $G.ReceiverName }}.{{ .FieldName }}
+		{{- if .ConvertType -}}){{- end }},
 		{{ end }}}
 
 	return sql, queryArgs
@@ -94,7 +114,11 @@ func ({{ .ReceiverName }} *{{ .StructName }}) SelectStatementOptions() []pgsql.S
 func ({{ .ReceiverName }} *{{ .StructName }}) SelectScan(rows pgx.Rows) error {
 	return rows.Scan(
 		{{ range .SelectColumns -}}
-		&{{ $G.ReceiverName }}.{{ .FieldName }},
+		{{ if .ConvertType -}}
+			(*{{ .ConvertType }})(
+		{{- end -}}
+		&{{ $G.ReceiverName }}.{{ .FieldName }}
+		{{- if .ConvertType -}}){{- end }},
 		{{ end }})
 }
 

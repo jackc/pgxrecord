@@ -130,24 +130,26 @@ func init() {
 type Column struct {
 	ColumnName string
 
-	FieldName string
-	FieldType string
+	FieldName   string
+	FieldType   string
+	ConvertType string `json:",omitempty"`
 
-	PrimaryKey      bool
-	Select          bool
-	Insert          bool
-	InsertReturning bool
-	Update          bool
+	PrimaryKey      bool `json:",omitempty"`
+	Select          bool `json:",omitempty"`
+	Insert          bool `json:",omitempty"`
+	InsertReturning bool `json:",omitempty"`
+	Update          bool `json:",omitempty"`
 }
 
 type Table struct {
 	SchemaName string
 	TableName  string
-	Columns    []*Column
 
 	PackageName  string
 	StructName   string
 	ReceiverName string
+
+	Columns []*Column
 }
 
 func filterColumns(input []*Column, f func(*Column) bool) []*Column {
