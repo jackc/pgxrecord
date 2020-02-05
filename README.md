@@ -7,6 +7,10 @@ Package pgxrecord is a tiny framework for CRUD operations and data mapping.
 
 It is not an ORM. It does not use reflection and it does not require code generation.
 
+## Package Status
+
+pgxrecord is functional and tested but highly experimental. The API may change at any time or the package may be abandoned.
+
 ## Example Usage
 
 Select all records matching conditions.
