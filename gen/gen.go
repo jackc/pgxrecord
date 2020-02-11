@@ -105,34 +105,13 @@ func init() {
 		pgtype.VarcharOID:          "pgtype.Varchar",
 		pgtype.XIDOID:              "pgtype.XID",
 	}
-
-	pgNotNullToGoTypeMap = map[pgtype.OID]string{
-		pgtype.BoolOID:        "bool",
-		pgtype.ByteaOID:       "[]byte",
-		pgtype.DateOID:        "time.Time",
-		pgtype.Float4OID:      "float32",
-		pgtype.Float8OID:      "float64",
-		pgtype.Int2OID:        "int16",
-		pgtype.Int4OID:        "int32",
-		pgtype.Int8OID:        "int64",
-		pgtype.MacaddrOID:     "net.HardwareAddr",
-		pgtype.NumericOID:     "decimal.Decimal",
-		pgtype.NumrangeOID:    "pgtype.Numrange",
-		pgtype.OIDOID:         "pgtype.OID",
-		pgtype.TextOID:        "string",
-		pgtype.TimestampOID:   "time.Time",
-		pgtype.TimestamptzOID: "time.Time",
-		pgtype.UUIDOID:        "uuid.UUID",
-		pgtype.VarcharOID:     "string",
-	}
 }
 
 type Column struct {
 	ColumnName string
 
-	FieldName   string
-	FieldType   string
-	ConvertType string `json:",omitempty"`
+	FieldName string
+	FieldType string
 
 	PrimaryKey      bool `json:",omitempty"`
 	Select          bool `json:",omitempty"`
