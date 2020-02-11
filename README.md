@@ -61,11 +61,8 @@ type Widget struct {
 	Name string
 }
 
-func (widget *Widget) SelectStatementOptions() []pgsql.StatementOption {
-	return []pgsql.StatementOption{
-		pgsql.Select("widgets.id, widgets.name"),
-		pgsql.From("widgets"),
-	}
+func (widget *Widget) SelectStatement() *pgsql.SelectStatement {
+	return pgsql.Select("widgets.id, widgets.name").From("widgets")
 }
 
 func (widget *Widget) SelectScan(rows pgx.Rows) error {

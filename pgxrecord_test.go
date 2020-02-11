@@ -55,11 +55,8 @@ func (widget *Widget) BeforeSave(op pgxrecord.Op) error {
 	return v.Errors()
 }
 
-func (widget *Widget) SelectStatementOptions() []pgsql.StatementOption {
-	return []pgsql.StatementOption{
-		pgsql.Select("widgets.id, widgets.name"),
-		pgsql.From("widgets"),
-	}
+func (widget *Widget) SelectStatement() *pgsql.SelectStatement {
+	return pgsql.Select("widgets.id, widgets.name").From("widgets")
 }
 
 func (widget *Widget) SelectScan(rows pgx.Rows) error {
@@ -345,7 +342,7 @@ func TestSelectOneSelects(t *testing.T) {
 func TestSelectOneErrorWhenNotFound(t *testing.T) {
 	withTx(t, func(ctx context.Context, tx pgx.Tx) {
 		widget := &Widget{}
-		err := pgxrecord.SelectOne(ctx, tx, widget)
+		err := pgxrecord.SelectOne(ctx, tx, widget, nil)
 		require.Error(t, err)
 		require.True(t, pgxrecord.NotFound(err))
 	})
@@ -359,7 +356,7 @@ func TestSelectOneErrorWhenTooManyRows(t *testing.T) {
 		require.NoError(t, err)
 
 		widget := &Widget{}
-		err = pgxrecord.SelectOne(ctx, tx, widget)
+		err = pgxrecord.SelectOne(ctx, tx, widget, nil)
 		require.Error(t, err)
 		require.Equal(t, "expected 1 row got 2", err.Error())
 	})
@@ -374,7 +371,7 @@ func TestSelectAllSelects(t *testing.T) {
 
 		var widgets WidgetCollection
 
-		err = pgxrecord.SelectAll(ctx, tx, &widgets)
+		err = pgxrecord.SelectAll(ctx, tx, &widgets, nil)
 		require.NoError(t, err)
 
 		assert.Len(t, widgets, 2)
@@ -446,16 +443,13 @@ func BenchmarkSelectOnePgx(b *testing.B) {
 		err := pgxrecord.Insert(ctx, tx, widget)
 		require.NoError(b, err)
 
-		stmt := pgsql.NewStatement()
-		err = stmt.Apply(pgsql.Select("id, widgets"), pgsql.From("widgets"), pgsql.Where("id=?", widget.ID))
-		if err != nil {
-			b.Fatal(err)
-		}
+		stmt := pgsql.Select("id, widgets").From("widgets").Where("id=?", widget.ID)
+		sql, args := pgsql.Build(stmt)
 
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
 			w := &Widget{}
-			err = tx.QueryRow(ctx, stmt.String(), stmt.Args.Values()...).Scan(&w.ID, &w.Name)
+			err = tx.QueryRow(ctx, sql, args...).Scan(&w.ID, &w.Name)
 			if err != nil {
 				b.Fatal(err)
 			}

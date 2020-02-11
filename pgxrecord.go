@@ -58,8 +58,8 @@ type DeleteScanner interface {
 }
 
 type Selector interface {
-	// SelectStatementOptions returns statement options to build a query that selects a record or records.
-	SelectStatementOptions() []pgsql.StatementOption
+	// SelectStatement returns a select statement that selects a record.
+	SelectStatement() *pgsql.SelectStatement
 
 	// SelectScan scans the current row into the record.
 	SelectScan(pgx.Rows) error
@@ -160,24 +160,18 @@ func Delete(ctx context.Context, db Queryer, record Deleter) error {
 	return queryOne(ctx, db, record, sql, queryArgs, f)
 }
 
-// SelectOne selects a single record from db into record. It applies options to the SQL statement. An error will be
+// SelectOne selects a single record from db into record. It merges scope into the SQL statement. An error will be
 // returned if no rows are found. Check for this case with the NotFound function. If multiple rows are selected an
 // error will be returned.
-func SelectOne(ctx context.Context, db Queryer, record Selector, options ...pgsql.StatementOption) error {
-	stmt := pgsql.NewStatement()
-
-	recordOptions := record.SelectStatementOptions()
-	err := stmt.Apply(recordOptions...)
-	if err != nil {
-		return err
+func SelectOne(ctx context.Context, db Queryer, record Selector, scope *pgsql.SelectStatement) error {
+	stmt := record.SelectStatement()
+	if scope != nil {
+		stmt.Merge(scope)
 	}
 
-	err = stmt.Apply(options...)
-	if err != nil {
-		return err
-	}
+	sql, args := pgsql.Build(stmt)
 
-	return queryOne(ctx, db, record, stmt.String(), stmt.Args.Values(), record.SelectScan)
+	return queryOne(ctx, db, record, sql, args, record.SelectScan)
 }
 
 type scanFunc func(rows pgx.Rows) error
@@ -211,23 +205,17 @@ func queryOne(ctx context.Context, db Queryer, record interface{}, sql string, q
 	return nil
 }
 
-// SelectAll selects records from db into collection. It applies options to the SQL statement.
-func SelectAll(ctx context.Context, db Queryer, collection SelectCollection, options ...pgsql.StatementOption) error {
-	stmt := pgsql.NewStatement()
-
+// SelectAll selects records from db into collection. It merges scope onto the SQL statement.
+func SelectAll(ctx context.Context, db Queryer, collection SelectCollection, scope *pgsql.SelectStatement) error {
 	record := collection.NewRecord()
-	recordOptions := record.SelectStatementOptions()
-	err := stmt.Apply(recordOptions...)
-	if err != nil {
-		return err
+	stmt := record.SelectStatement()
+	if scope != nil {
+		stmt.Merge(scope)
 	}
 
-	err = stmt.Apply(options...)
-	if err != nil {
-		return err
-	}
+	sql, args := pgsql.Build(stmt)
 
-	rows, err := db.Query(ctx, stmt.String(), stmt.Args.Values()...)
+	rows, err := db.Query(ctx, sql, args...)
 	if err != nil {
 		return tryMapPgError(record, err)
 	}

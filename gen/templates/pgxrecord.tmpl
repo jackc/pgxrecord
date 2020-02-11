@@ -103,12 +103,8 @@ where
 	return sql, queryArgs
 }
 
-func ({{ .ReceiverName }} *{{ .StructName }}) SelectStatementOptions() []pgsql.StatementOption {
-	return []pgsql.StatementOption{
-		pgsql.Select(`{{ range $i, $c := .SelectColumns }}{{ if gt $i 0 }},
-  {{ end }}{{ .ColumnName }}{{ end }}`),
-		pgsql.From(`{{ .TableName }}`),
-	}
+func ({{ .ReceiverName }} *{{ .StructName }}) SelectStatement() *pgsql.SelectStatement {
+	return pgsql.Select(`{{ range $i, $c := .SelectColumns }}{{ if gt $i 0 }}, {{ end }}{{ $G.TableName}}.{{ .ColumnName }}{{ end }}`).From(`{{ .TableName }}`)
 }
 
 func ({{ .ReceiverName }} *{{ .StructName }}) SelectScan(rows pgx.Rows) error {
