@@ -72,6 +72,6 @@ func init() {
 	newCmd.Flags().String("struct", "", "struct name")
 	viper.BindPFlag("struct", newCmd.Flags().Lookup("struct"))
 
-	newCmd.Flags().String("receiver", "r", "receiver name")
+	newCmd.Flags().String("receiver", "row", "receiver name")
 	viper.BindPFlag("receiver", newCmd.Flags().Lookup("receiver"))
 }

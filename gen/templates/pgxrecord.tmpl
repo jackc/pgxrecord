@@ -122,12 +122,12 @@ func ({{ .ReceiverName }} *{{ .StructName }}) DeleteStatement() (*pgsql.DeleteSt
 }
 
 func ({{ .ReceiverName }} *{{ .StructName }}) SelectStatement() (*pgsql.SelectStatement, error) {
-	return pgsql.Select(`{{ range $i, $c := .SelectColumns }}{{ if gt $i 0 }}, {{ end }}{{ $G.TableName}}.{{ .ColumnName }}{{ end }}`).From(`{{ .TableName }}`), nil
+	return pgsql.Select(`{{ range $i, $c := .Columns }}{{ if gt $i 0 }}, {{ end }}{{ $G.TableName}}.{{ .ColumnName }}{{ end }}`).From(`{{ .TableName }}`), nil
 }
 
 func ({{ .ReceiverName }} *{{ .StructName }}) SelectScan(rows pgx.Rows) error {
 	return rows.Scan(
-		{{ range .SelectColumns -}}
+		{{ range .Columns -}}
 		&{{ $G.ReceiverName }}.{{ .FieldName }},
 		{{ end }})
 }

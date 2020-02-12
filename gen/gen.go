@@ -114,10 +114,7 @@ type Column struct {
 	FieldType string
 
 	PrimaryKey      bool `json:",omitempty"`
-	Select          bool `json:",omitempty"`
-	Insert          bool `json:",omitempty"`
 	InsertReturning bool `json:",omitempty"`
-	Update          bool `json:",omitempty"`
 }
 
 type Table struct {
@@ -146,20 +143,8 @@ func (t *Table) PrimaryKeyColumns() []*Column {
 	return filterColumns(t.Columns, func(c *Column) bool { return c.PrimaryKey })
 }
 
-func (t *Table) SelectColumns() []*Column {
-	return filterColumns(t.Columns, func(c *Column) bool { return c.Select })
-}
-
-func (t *Table) InsertColumns() []*Column {
-	return filterColumns(t.Columns, func(c *Column) bool { return c.Insert })
-}
-
 func (t *Table) InsertReturningColumns() []*Column {
 	return filterColumns(t.Columns, func(c *Column) bool { return c.InsertReturning })
-}
-
-func (t *Table) UpdateColumns() []*Column {
-	return filterColumns(t.Columns, func(c *Column) bool { return c.Update })
 }
 
 func (t *Table) Generate(w io.Writer) error {
@@ -234,10 +219,7 @@ order by attnum`, tableOID)
 			ColumnName:      attname,
 			FieldName:       ToFieldName(attname),
 			PrimaryKey:      isprimary,
-			Select:          true,
-			Insert:          !isprimary,
 			InsertReturning: isprimary,
-			Update:          !isprimary,
 		}
 
 		if t, ok := pgNotNullToGoTypeMap[atttypid]; attnotnull && ok {
