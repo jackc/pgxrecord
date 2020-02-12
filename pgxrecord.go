@@ -83,8 +83,8 @@ func NotFound(err error) bool {
 	return ok
 }
 
-// Insert inserts record into db.
-func Insert(ctx context.Context, db Queryer, record Inserter) error {
+// Insert inserts record into db. If the insert query does not affect exactly one record an error will be returned.
+func InsertOne(ctx context.Context, db Queryer, record Inserter) error {
 	stmt, err := record.InsertStatement()
 	if err != nil {
 		return err
@@ -100,7 +100,7 @@ func Insert(ctx context.Context, db Queryer, record Inserter) error {
 }
 
 // Update updates record in db. If the update query does not affect exactly one record an error will be returned.
-func Update(ctx context.Context, db Queryer, record Updater) error {
+func UpdateOne(ctx context.Context, db Queryer, record Updater) error {
 	stmt, err := record.UpdateStatement()
 	if err != nil {
 		return err
@@ -110,7 +110,7 @@ func Update(ctx context.Context, db Queryer, record Updater) error {
 }
 
 // Delete deletes record in db. If the delete query does affect exactly one record an error will be returned.
-func Delete(ctx context.Context, db Queryer, record Deleter) error {
+func DeleteOne(ctx context.Context, db Queryer, record Deleter) error {
 	stmt, err := record.DeleteStatement()
 	if err != nil {
 		return err

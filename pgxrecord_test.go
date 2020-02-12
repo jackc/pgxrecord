@@ -124,7 +124,7 @@ func TestInsertInserts(t *testing.T) {
 	withTx(t, func(ctx context.Context, tx pgx.Tx) {
 		widget := &Widget{}
 		widget.Name.Set("sprocket")
-		err := pgxrecord.Insert(ctx, tx, widget)
+		err := pgxrecord.InsertOne(ctx, tx, widget)
 		require.NoError(t, err)
 
 		readBack := &Widget{}
@@ -165,7 +165,7 @@ func TestInsertWithoutReturningScan(t *testing.T) {
 	withTx(t, func(ctx context.Context, tx pgx.Tx) {
 		widget := &widgetWithoutInsertReturning{}
 		widget.Name.Set("sprocket")
-		err := pgxrecord.Insert(ctx, tx, widget)
+		err := pgxrecord.InsertOne(ctx, tx, widget)
 		assert.NoError(t, err)
 
 		assert.EqualValues(t, 0, widget.ID.Get())
@@ -181,11 +181,11 @@ func TestUpdateUpdates(t *testing.T) {
 	withTx(t, func(ctx context.Context, tx pgx.Tx) {
 		widget := &Widget{}
 		widget.Name.Set("sprocket")
-		err := pgxrecord.Insert(ctx, tx, widget)
+		err := pgxrecord.InsertOne(ctx, tx, widget)
 		require.NoError(t, err)
 
 		widget.Name.Set("device")
-		err = pgxrecord.Update(ctx, tx, widget)
+		err = pgxrecord.UpdateOne(ctx, tx, widget)
 		require.NoError(t, err)
 
 		readBack := &Widget{}
@@ -207,7 +207,7 @@ func TestUpdateNotFound(t *testing.T) {
 		widget := &Widget{}
 		widget.ID.Set(42)
 		widget.Name.Set("sprocket")
-		err := pgxrecord.Update(ctx, tx, widget)
+		err := pgxrecord.UpdateOne(ctx, tx, widget)
 		require.Error(t, err)
 		require.True(t, pgxrecord.NotFound(err))
 	})
@@ -215,12 +215,12 @@ func TestUpdateNotFound(t *testing.T) {
 
 func TestUpdateTooMany(t *testing.T) {
 	withTx(t, func(ctx context.Context, tx pgx.Tx) {
-		err := pgxrecord.Insert(ctx, tx, &Widget{Name: pgtype.Text{String: "sprocket", Status: pgtype.Present}})
+		err := pgxrecord.InsertOne(ctx, tx, &Widget{Name: pgtype.Text{String: "sprocket", Status: pgtype.Present}})
 		require.NoError(t, err)
-		err = pgxrecord.Insert(ctx, tx, &Widget{Name: pgtype.Text{String: "device", Status: pgtype.Present}})
+		err = pgxrecord.InsertOne(ctx, tx, &Widget{Name: pgtype.Text{String: "device", Status: pgtype.Present}})
 		require.NoError(t, err)
 
-		err = pgxrecord.Update(ctx, tx, pgsql.Update("widgets").Setf("name=name"))
+		err = pgxrecord.UpdateOne(ctx, tx, pgsql.Update("widgets").Setf("name=name"))
 		require.Error(t, err)
 		require.Equal(t, "expected 1 row got 2", err.Error())
 	})
@@ -230,10 +230,10 @@ func TestDeleteDeletes(t *testing.T) {
 	withTx(t, func(ctx context.Context, tx pgx.Tx) {
 		widget := &Widget{}
 		widget.Name.Set("sprocket")
-		err := pgxrecord.Insert(ctx, tx, widget)
+		err := pgxrecord.InsertOne(ctx, tx, widget)
 		require.NoError(t, err)
 
-		err = pgxrecord.Delete(ctx, tx, widget)
+		err = pgxrecord.DeleteOne(ctx, tx, widget)
 		assert.NoError(t, err)
 
 		var n int
@@ -248,7 +248,7 @@ func TestDeleteNotFound(t *testing.T) {
 		widget := &Widget{}
 		widget.ID.Set(42)
 		widget.Name.Set("sprocket")
-		err := pgxrecord.Delete(ctx, tx, widget)
+		err := pgxrecord.DeleteOne(ctx, tx, widget)
 		require.Error(t, err)
 		require.True(t, pgxrecord.NotFound(err))
 	})
@@ -256,12 +256,12 @@ func TestDeleteNotFound(t *testing.T) {
 
 func TestDeleteTooMany(t *testing.T) {
 	withTx(t, func(ctx context.Context, tx pgx.Tx) {
-		err := pgxrecord.Insert(ctx, tx, &Widget{Name: pgtype.Text{String: "sprocket", Status: pgtype.Present}})
+		err := pgxrecord.InsertOne(ctx, tx, &Widget{Name: pgtype.Text{String: "sprocket", Status: pgtype.Present}})
 		require.NoError(t, err)
-		err = pgxrecord.Insert(ctx, tx, &Widget{Name: pgtype.Text{String: "device", Status: pgtype.Present}})
+		err = pgxrecord.InsertOne(ctx, tx, &Widget{Name: pgtype.Text{String: "device", Status: pgtype.Present}})
 		require.NoError(t, err)
 
-		err = pgxrecord.Delete(ctx, tx, pgsql.Delete("widgets"))
+		err = pgxrecord.DeleteOne(ctx, tx, pgsql.Delete("widgets"))
 		require.Error(t, err)
 		require.Equal(t, "expected 1 row got 2", err.Error())
 	})
@@ -283,7 +283,7 @@ func TestSelectOneSelects(t *testing.T) {
 	withTx(t, func(ctx context.Context, tx pgx.Tx) {
 		dbWidget := &Widget{}
 		dbWidget.Name.Set("sprocket")
-		err := pgxrecord.Insert(ctx, tx, dbWidget)
+		err := pgxrecord.InsertOne(ctx, tx, dbWidget)
 		require.NoError(t, err)
 
 		selectedWidget := &Widget{}
@@ -306,9 +306,9 @@ func TestSelectOneErrorWhenNotFound(t *testing.T) {
 
 func TestSelectOneErrorWhenTooManyRows(t *testing.T) {
 	withTx(t, func(ctx context.Context, tx pgx.Tx) {
-		err := pgxrecord.Insert(ctx, tx, &Widget{Name: pgtype.Text{String: "sprocket", Status: pgtype.Present}})
+		err := pgxrecord.InsertOne(ctx, tx, &Widget{Name: pgtype.Text{String: "sprocket", Status: pgtype.Present}})
 		require.NoError(t, err)
-		err = pgxrecord.Insert(ctx, tx, &Widget{Name: pgtype.Text{String: "device", Status: pgtype.Present}})
+		err = pgxrecord.InsertOne(ctx, tx, &Widget{Name: pgtype.Text{String: "device", Status: pgtype.Present}})
 		require.NoError(t, err)
 
 		widget := &Widget{}
@@ -320,9 +320,9 @@ func TestSelectOneErrorWhenTooManyRows(t *testing.T) {
 
 func TestSelectAllSelects(t *testing.T) {
 	withTx(t, func(ctx context.Context, tx pgx.Tx) {
-		err := pgxrecord.Insert(ctx, tx, &Widget{Name: pgtype.Text{String: "sprocket", Status: pgtype.Present}})
+		err := pgxrecord.InsertOne(ctx, tx, &Widget{Name: pgtype.Text{String: "sprocket", Status: pgtype.Present}})
 		require.NoError(t, err)
-		err = pgxrecord.Insert(ctx, tx, &Widget{Name: pgtype.Text{String: "device", Status: pgtype.Present}})
+		err = pgxrecord.InsertOne(ctx, tx, &Widget{Name: pgtype.Text{String: "device", Status: pgtype.Present}})
 		require.NoError(t, err)
 
 		var widgets WidgetCollection
@@ -336,9 +336,9 @@ func TestSelectAllSelects(t *testing.T) {
 
 func TestSelectAllOptions(t *testing.T) {
 	withTx(t, func(ctx context.Context, tx pgx.Tx) {
-		err := pgxrecord.Insert(ctx, tx, &Widget{Name: pgtype.Text{String: "sprocket", Status: pgtype.Present}})
+		err := pgxrecord.InsertOne(ctx, tx, &Widget{Name: pgtype.Text{String: "sprocket", Status: pgtype.Present}})
 		require.NoError(t, err)
-		err = pgxrecord.Insert(ctx, tx, &Widget{Name: pgtype.Text{String: "device", Status: pgtype.Present}})
+		err = pgxrecord.InsertOne(ctx, tx, &Widget{Name: pgtype.Text{String: "device", Status: pgtype.Present}})
 		require.NoError(t, err)
 
 		var widgets WidgetCollection
@@ -352,9 +352,9 @@ func TestSelectAllOptions(t *testing.T) {
 
 func TestSelectAllWhenNoResults(t *testing.T) {
 	withTx(t, func(ctx context.Context, tx pgx.Tx) {
-		err := pgxrecord.Insert(ctx, tx, &Widget{Name: pgtype.Text{String: "sprocket", Status: pgtype.Present}})
+		err := pgxrecord.InsertOne(ctx, tx, &Widget{Name: pgtype.Text{String: "sprocket", Status: pgtype.Present}})
 		require.NoError(t, err)
-		err = pgxrecord.Insert(ctx, tx, &Widget{Name: pgtype.Text{String: "device", Status: pgtype.Present}})
+		err = pgxrecord.InsertOne(ctx, tx, &Widget{Name: pgtype.Text{String: "device", Status: pgtype.Present}})
 		require.NoError(t, err)
 
 		var widgets WidgetCollection
@@ -368,9 +368,9 @@ func TestSelectAllWhenNoResults(t *testing.T) {
 
 func TestPgErrorMapper(t *testing.T) {
 	withTx(t, func(ctx context.Context, tx pgx.Tx) {
-		err := pgxrecord.Insert(ctx, tx, &Widget{Name: pgtype.Text{String: "sprocket", Status: pgtype.Present}})
+		err := pgxrecord.InsertOne(ctx, tx, &Widget{Name: pgtype.Text{String: "sprocket", Status: pgtype.Present}})
 		require.NoError(t, err)
-		err = pgxrecord.Insert(ctx, tx, &Widget{Name: pgtype.Text{String: "sprocket", Status: pgtype.Present}})
+		err = pgxrecord.InsertOne(ctx, tx, &Widget{Name: pgtype.Text{String: "sprocket", Status: pgtype.Present}})
 		require.Error(t, err)
 		assert.Equal(t, "mapped error", err.Error())
 	})
@@ -379,7 +379,7 @@ func TestPgErrorMapper(t *testing.T) {
 func BenchmarkSelectOne(b *testing.B) {
 	withTx(b, func(ctx context.Context, tx pgx.Tx) {
 		widget := &Widget{Name: pgtype.Text{String: "sprocket", Status: pgtype.Present}}
-		err := pgxrecord.Insert(ctx, tx, widget)
+		err := pgxrecord.InsertOne(ctx, tx, widget)
 		require.NoError(b, err)
 
 		b.ResetTimer()
@@ -396,7 +396,7 @@ func BenchmarkSelectOne(b *testing.B) {
 func BenchmarkSelectOnePgx(b *testing.B) {
 	withTx(b, func(ctx context.Context, tx pgx.Tx) {
 		widget := &Widget{Name: pgtype.Text{String: "sprocket", Status: pgtype.Present}}
-		err := pgxrecord.Insert(ctx, tx, widget)
+		err := pgxrecord.InsertOne(ctx, tx, widget)
 		require.NoError(b, err)
 
 		stmt := pgsql.Select("id, widgets").From("widgets").Where("id=?", widget.ID)
