@@ -6,6 +6,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/jackc/imperator/normalize"
+	"github.com/jackc/imperator/validate"
 	"github.com/jackc/pgconn"
 	"github.com/jackc/pgsql"
 	"github.com/jackc/pgtype"
@@ -46,6 +48,16 @@ type Widget struct {
 	Name pgtype.Text
 }
 
+func (widget *Widget) BeforeSave(op pgxrecord.Op) error {
+	if widget.Name.Status == pgtype.Present {
+		widget.Name.String = normalize.TextField(widget.Name.String)
+	}
+
+	v := &validate.Validator{}
+	v.Presence("name", widget.Name.String)
+	return v.Errors()
+}
+
 func (widget *Widget) SelectStatement() *pgsql.SelectStatement {
 	return pgsql.Select("widgets.id, widgets.name").From("widgets")
 }
@@ -62,10 +74,22 @@ func (widget *Widget) WherePrimaryKey() *pgsql.SelectStatement {
 	return pgsql.Where("id=?", widget.ID)
 }
 
-func (widget *Widget) InsertQuery() (sql string, queryArgs []interface{}) {
-	sql = "insert into widgets(name) values ($1) returning id"
-	queryArgs = []interface{}{widget.Name}
-	return sql, queryArgs
+func (widget *Widget) InsertStatement() *pgsql.InsertStatement {
+	columns := make([]string, 0, 2)
+	values := make([]interface{}, 0, 2)
+
+	if widget.ID.Status != pgtype.Undefined {
+		columns = append(columns, "id")
+		values = append(values, widget.ID)
+	}
+
+	if widget.Name.Status != pgtype.Undefined {
+		columns = append(columns, "name")
+		values = append(values, widget.Name)
+	}
+
+	vs := pgsql.Values().Row(values...)
+	return pgsql.Insert("widgets").Columns(columns...).Values(vs).Returning("id")
 }
 
 func (widget *Widget) InsertScan(rows pgx.Rows) error {
@@ -136,8 +160,22 @@ func TestInsertCallsBeforeSave(t *testing.T) {
 
 type widgetWithoutInsertReturning Widget
 
-func (widget *widgetWithoutInsertReturning) InsertQuery() (sql string, queryArgs []interface{}) {
-	return (*Widget)(widget).InsertQuery()
+func (widget *widgetWithoutInsertReturning) InsertStatement() *pgsql.InsertStatement {
+	columns := make([]string, 0, 2)
+	values := make([]interface{}, 0, 2)
+
+	if widget.ID.Status != pgtype.Undefined {
+		columns = append(columns, "id")
+		values = append(values, widget.ID)
+	}
+
+	if widget.Name.Status != pgtype.Undefined {
+		columns = append(columns, "name")
+		values = append(values, widget.Name)
+	}
+
+	vs := pgsql.Values().Row(values...)
+	return pgsql.Insert("widgets").Columns(columns...).Values(vs)
 }
 
 func TestInsertWithoutReturningScan(t *testing.T) {

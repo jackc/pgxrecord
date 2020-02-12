@@ -28,8 +28,7 @@ type BeforeSaver interface {
 }
 
 type Inserter interface {
-	// InsertQuery returns the sql and query arguments used to insert the record.
-	InsertQuery() (sql string, queryArgs []interface{})
+	InsertStatement() *pgsql.InsertStatement
 }
 
 type InsertScanner interface {
@@ -110,13 +109,15 @@ func Insert(ctx context.Context, db Queryer, record Inserter) error {
 		}
 	}
 
-	sql, queryArgs := record.InsertQuery()
+	stmt := record.InsertStatement()
+	sql, args := pgsql.Build(stmt)
+
 	var f scanFunc
 	if record, ok := record.(InsertScanner); ok {
 		f = func(rows pgx.Rows) error { return record.InsertScan(rows) }
 	}
 
-	return queryOne(ctx, db, record, sql, queryArgs, f)
+	return queryOne(ctx, db, record, sql, args, f)
 }
 
 // Update updates record in db. If record implements BeforeSaver then BeforeSave will be called. If an error is
