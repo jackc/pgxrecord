@@ -2,6 +2,8 @@
 package {{ .PackageName }}
 
 import (
+	"encoding/json"
+
 	"github.com/jackc/pgsql"
 	"github.com/jackc/pgx/v4"
 	"github.com/jackc/pgxrecord"
@@ -40,6 +42,10 @@ func ({{ .ReceiverName }} *{{ .StructName }}) AttrMap() pgxrecord.AttrMap {
 	{{ end }}
 
 	return m
+}
+
+func ({{ .ReceiverName }} *{{ .StructName }}) MarshalJSON() ([]byte, error) {
+	return json.Marshal({{ .ReceiverName }}.AttrMap())
 }
 
 func ({{ .ReceiverName }} *{{ .StructName }}) InsertStatement() (*pgsql.InsertStatement, error) {
