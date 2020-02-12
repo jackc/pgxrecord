@@ -41,8 +41,7 @@ type Updater interface {
 }
 
 type Deleter interface {
-	TableName() string
-	WherePrimaryKey() *pgsql.SelectStatement
+	DeleteStatement() *pgsql.DeleteStatement
 }
 
 type Selector interface {
@@ -135,7 +134,7 @@ func Update(ctx context.Context, db Queryer, record Updater) error {
 
 // Delete deletes record in db. If the delete query does affect exactly one record an error will be returned.
 func Delete(ctx context.Context, db Queryer, record Deleter) error {
-	stmt := pgsql.Delete(record.TableName()).Apply(record.WherePrimaryKey())
+	stmt := record.DeleteStatement()
 	sql, args := pgsql.Build(stmt)
 	return queryOne(ctx, db, record, sql, args, nil)
 }

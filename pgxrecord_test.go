@@ -66,14 +66,6 @@ func (widget *Widget) SelectScan(rows pgx.Rows) error {
 	return rows.Scan(&widget.ID, &widget.Name)
 }
 
-func (widget *Widget) TableName() string {
-	return "widgets"
-}
-
-func (widget *Widget) WherePrimaryKey() *pgsql.SelectStatement {
-	return pgsql.Where("id=?", widget.ID)
-}
-
 func (widget *Widget) InsertStatement() *pgsql.InsertStatement {
 	columns := make([]string, 0, 2)
 	values := make([]interface{}, 0, 2)
@@ -108,6 +100,10 @@ func (widget *Widget) UpdateStatement() *pgsql.UpdateStatement {
 	}
 
 	return pgsql.Update("widgets").Set(assignments).Where("id=?", widget.ID)
+}
+
+func (widget *Widget) DeleteStatement() *pgsql.DeleteStatement {
+	return pgsql.Delete("widgets").Where("id=?", widget.ID)
 }
 
 func (widget *Widget) MapPgError(*pgconn.PgError) error {
@@ -285,12 +281,8 @@ func TestDeleteNotFound(t *testing.T) {
 
 type widgetDeletesTooMany Widget
 
-func (widget *widgetDeletesTooMany) TableName() string {
-	return "widgets"
-}
-
-func (widget *widgetDeletesTooMany) WherePrimaryKey() *pgsql.SelectStatement {
-	return pgsql.Where("true")
+func (widget *widgetDeletesTooMany) DeleteStatement() *pgsql.DeleteStatement {
+	return pgsql.Delete("widgets")
 }
 
 func TestDeleteTooMany(t *testing.T) {
