@@ -28,7 +28,7 @@ type BeforeSaver interface {
 }
 
 type Inserter interface {
-	InsertStatement() *pgsql.InsertStatement
+	InsertStatement() (*pgsql.InsertStatement, error)
 }
 
 type InsertScanner interface {
@@ -106,7 +106,10 @@ func Insert(ctx context.Context, db Queryer, record Inserter) error {
 		}
 	}
 
-	stmt := record.InsertStatement()
+	stmt, err := record.InsertStatement()
+	if err != nil {
+		return err
+	}
 	sql, args := pgsql.Build(stmt)
 
 	var f scanFunc

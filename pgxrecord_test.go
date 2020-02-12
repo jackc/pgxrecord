@@ -66,7 +66,7 @@ func (widget *Widget) SelectScan(rows pgx.Rows) error {
 	return rows.Scan(&widget.ID, &widget.Name)
 }
 
-func (widget *Widget) InsertStatement() *pgsql.InsertStatement {
+func (widget *Widget) InsertStatement() (*pgsql.InsertStatement, error) {
 	columns := make([]string, 0, 2)
 	values := make([]interface{}, 0, 2)
 
@@ -80,8 +80,12 @@ func (widget *Widget) InsertStatement() *pgsql.InsertStatement {
 		values = append(values, widget.Name)
 	}
 
+	if len(columns) == 0 {
+		return nil, errors.New("no attributes to insert")
+	}
+
 	vs := pgsql.Values().Row(values...)
-	return pgsql.Insert("widgets").Columns(columns...).Values(vs).Returning("id")
+	return pgsql.Insert("widgets").Columns(columns...).Values(vs).Returning("id"), nil
 }
 
 func (widget *Widget) InsertScan(rows pgx.Rows) error {
@@ -156,7 +160,7 @@ func TestInsertCallsBeforeSave(t *testing.T) {
 
 type widgetWithoutInsertReturning Widget
 
-func (widget *widgetWithoutInsertReturning) InsertStatement() *pgsql.InsertStatement {
+func (widget *widgetWithoutInsertReturning) InsertStatement() (*pgsql.InsertStatement, error) {
 	columns := make([]string, 0, 2)
 	values := make([]interface{}, 0, 2)
 
@@ -171,7 +175,7 @@ func (widget *widgetWithoutInsertReturning) InsertStatement() *pgsql.InsertState
 	}
 
 	vs := pgsql.Values().Row(values...)
-	return pgsql.Insert("widgets").Columns(columns...).Values(vs)
+	return pgsql.Insert("widgets").Columns(columns...).Values(vs), nil
 }
 
 func TestInsertWithoutReturningScan(t *testing.T) {
