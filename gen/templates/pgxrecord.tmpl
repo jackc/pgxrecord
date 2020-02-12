@@ -5,6 +5,7 @@ import (
 	"github.com/jackc/pgsql"
 	"github.com/jackc/pgx/v4"
 	"github.com/jackc/pgxrecord"
+	"github.com/jackc/pgtype"
 	pgtypeuuid "github.com/jackc/pgtype/ext/gofrs-uuid"
 	"github.com/gofrs/uuid"
 	shopspring "github.com/jackc/pgtype/ext/shopspring-numeric"
@@ -47,40 +48,28 @@ func ({{ .ReceiverName }} *{{ .StructName }}) InsertScan(rows pgx.Rows) error {
 }
 {{ end }}
 
-{{ if and .PrimaryKeyColumns .UpdateColumns }}
-func ({{ .ReceiverName }} *{{ .StructName }}) UpdateQuery() (sql string, queryArgs []interface{}) {
-	sql = `update {{ .TableName }}
-set
-{{ range $i, $c := .UpdateColumns }}{{ if gt $i 0 }},
-{{ end }}  {{ .ColumnName }}=${{ add $i 1 }}{{ end }}
-where
-{{ range $i, $c := .PrimaryKeyColumns }}{{ if gt $i 0 }},
-{{ end }}  {{ .ColumnName }}=${{ len $G.UpdateColumns | add $i | add 1 }}{{ end }}`
+func ({{ .ReceiverName }} *{{ .StructName }}) UpdateData() ([]*pgsql.Assignment) {
+	assignments := make([]*pgsql.Assignment, 0, {{ len .Columns }})
 
-	queryArgs = []interface{}{
-		{{ range .UpdateColumns -}}
-		{{ $G.ReceiverName }}.{{ .FieldName }},
-		{{ end -}}
-		{{ range .PrimaryKeyColumns -}}
-		{{ $G.ReceiverName }}.{{ .FieldName }},
-		{{ end }}}
+	{{ range $i, $c := .Columns }}
+	if {{ $G.ReceiverName }}.{{ .FieldName }}.Status != pgtype.Undefined {
+		assignments = append(assignments, &pgsql.Assignment{Left: pgsql.Ident{`{{ .ColumnName }}`}, Right: pgsql.Param{Value: {{ $G.ReceiverName }}.{{ .FieldName }}}})
+	}
+	{{ end }}
 
-	return sql, queryArgs
+	return assignments
 }
-{{ end }}
 
-func ({{ .ReceiverName }} *{{ .StructName }}) DeleteQuery() (sql string, queryArgs []interface{}) {
-	sql = `delete from {{ .TableName }}
-where
-{{ range $i, $c := .PrimaryKeyColumns }}{{ if gt $i 0 }},
-{{ end }}  {{ .ColumnName }}=${{ add $i 1 }}{{ end }}`
+func ({{ .ReceiverName }} *{{ .StructName }}) TableName() string {
+	return `{{ .TableName }}`
+}
 
-	queryArgs = []interface{}{
-		{{ range .PrimaryKeyColumns -}}
-		{{ $G.ReceiverName }}.{{ .FieldName }},
-		{{ end }}}
-
-	return sql, queryArgs
+func ({{ .ReceiverName }} *{{ .StructName }}) WherePrimaryKey() (*pgsql.SelectStatement) {
+	s := &pgsql.SelectStatement{}
+	{{ range .PrimaryKeyColumns -}}
+	s.Where("{{ .ColumnName }}=?", {{ $G.ReceiverName }}.{{ .FieldName }})
+	{{ end -}}
+	return s
 }
 
 func ({{ .ReceiverName }} *{{ .StructName }}) SelectStatement() *pgsql.SelectStatement {
