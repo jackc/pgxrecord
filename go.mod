@@ -11,7 +11,7 @@ require (
 	github.com/imdario/mergo v0.3.8 // indirect
 	github.com/jackc/imperator v0.0.0-20200112015601-e15c4016af46
 	github.com/jackc/pgconn v1.3.1
-	github.com/jackc/pgsql v0.0.0-20200210222618-8474178eec83
+	github.com/jackc/pgsql v0.0.0-20200212172518-579d9581f3ec
 	github.com/jackc/pgtype v1.2.0
 	github.com/jackc/pgx/v4 v4.4.0
 	github.com/mitchellh/copystructure v1.0.0 // indirect

@@ -4,6 +4,7 @@ package pgxrecord
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/jackc/pgconn"
 	"github.com/jackc/pgsql"
@@ -33,7 +34,7 @@ type Deleter interface {
 
 type Selector interface {
 	// SelectStatement returns a select statement that selects a record.
-	SelectStatement() *pgsql.SelectStatement
+	SelectStatement() (*pgsql.SelectStatement, error)
 
 	// SelectScan scans the current row into the record.
 	SelectScan(pgx.Rows) error
@@ -123,7 +124,13 @@ func DeleteOne(ctx context.Context, db Queryer, record Deleter) error {
 // returned if no rows are found. Check for this case with the NotFound function. If multiple rows are selected an
 // error will be returned.
 func SelectOne(ctx context.Context, db Queryer, record Selector, scopes ...*pgsql.SelectStatement) error {
-	stmt := record.SelectStatement().Apply(scopes...)
+	stmt, err := record.SelectStatement()
+	if err != nil {
+		return err
+	}
+
+	stmt.Apply(scopes...)
+
 	sql, args := pgsql.Build(stmt)
 	return queryOne(ctx, db, record, sql, args, record.SelectScan)
 }
@@ -162,7 +169,13 @@ func queryOne(ctx context.Context, db Queryer, record interface{}, sql string, q
 // SelectAll selects records from db into collection. It applies scopes to the SQL statement.
 func SelectAll(ctx context.Context, db Queryer, collection SelectCollection, scopes ...*pgsql.SelectStatement) error {
 	record := collection.NewRecord()
-	stmt := record.SelectStatement().Apply(scopes...)
+	stmt, err := record.SelectStatement()
+	if err != nil {
+		return err
+	}
+
+	stmt.Apply(scopes...)
+
 	sql, args := pgsql.Build(stmt)
 
 	rows, err := db.Query(ctx, sql, args...)
@@ -185,6 +198,70 @@ func SelectAll(ctx context.Context, db Queryer, collection SelectCollection, sco
 	}
 	if rows.Err() != nil {
 		return tryMapPgError(record, rows.Err())
+	}
+
+	return nil
+}
+
+type Field interface {
+	Get() interface{}
+	Set(interface{}) error
+}
+
+type FieldByColumnNamer interface {
+	FieldByColumnName(string) (Field, error)
+}
+
+type AttrMapper interface {
+	AttrMap() AttrMap
+}
+
+type AttrMap map[string]interface{}
+
+func (m AttrMap) AttrMap() AttrMap {
+	return m
+}
+
+type AttrsErrors map[string]error
+
+func (errs AttrsErrors) Error() string {
+	sb := &strings.Builder{}
+	i := 0
+	for k, v := range errs {
+		if i > 0 {
+			sb.WriteString(", ")
+		}
+		fmt.Fprintf(sb, "%s: %v", k, v)
+		i++
+	}
+
+	return sb.String()
+}
+
+func AssignAttrs(record FieldByColumnNamer, attrMapper AttrMapper) error {
+	attrMap := attrMapper.AttrMap()
+	var attrsErrs AttrsErrors
+	for k, v := range attrMap {
+		field, err := record.FieldByColumnName(k)
+		if err != nil {
+			if attrsErrs == nil {
+				attrsErrs = make(AttrsErrors)
+			}
+			attrsErrs[k] = err
+			continue
+		}
+
+		err = field.Set(v)
+		if err != nil {
+			if attrsErrs == nil {
+				attrsErrs = make(AttrsErrors)
+			}
+			attrsErrs[k] = err
+		}
+	}
+
+	if len(attrsErrs) > 0 {
+		return attrsErrs
 	}
 
 	return nil

@@ -99,6 +99,8 @@ github.com/jackc/pgsql v0.0.0-20200111170311-34c960b1cb44 h1:47Vmt3/c7RWzpNpPwWe
 github.com/jackc/pgsql v0.0.0-20200111170311-34c960b1cb44/go.mod h1:C1+W/COEldKWaNC1JMrPFj9+BN6LtPN5bG04qAi26go=
 github.com/jackc/pgsql v0.0.0-20200210222618-8474178eec83 h1:Mvb9zkwK9sorfvvlHDF5DhWYMp/ARD1b25AE24g96qQ=
 github.com/jackc/pgsql v0.0.0-20200210222618-8474178eec83/go.mod h1:C1+W/COEldKWaNC1JMrPFj9+BN6LtPN5bG04qAi26go=
+github.com/jackc/pgsql v0.0.0-20200212172518-579d9581f3ec h1:QWxK6lm2sjP94THa0vT26M6mal0itQ1uebsm2+0Gu78=
+github.com/jackc/pgsql v0.0.0-20200212172518-579d9581f3ec/go.mod h1:09yN2ruY5iHwd6P7obapEjtEjI9mNvhvzV6bl3ehjNM=
 github.com/jackc/pgtype v0.0.0-20190421001408-4ed0de4755e0/go.mod h1:hdSHsc1V01CGwFsrv11mJRHWJ6aifDLfdV3aVjFF0zg=
 github.com/jackc/pgtype v0.0.0-20190824184912-ab885b375b90/go.mod h1:KcahbBH1nCMSo2DXpzsoWOAfFkdEtEJpPbVLq8eE+mc=
 github.com/jackc/pgtype v0.0.0-20190828014616-a8802b16cc59/go.mod h1:MWlu30kVJrUS8lot6TQqcg7mtthZ9T0EoIBFiJcmcyw=

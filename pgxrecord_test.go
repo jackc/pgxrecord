@@ -46,8 +46,19 @@ type Widget struct {
 	Name pgtype.Text
 }
 
-func (widget *Widget) SelectStatement() *pgsql.SelectStatement {
-	return pgsql.Select("widgets.id, widgets.name").From("widgets")
+func (widget *Widget) FieldByColumnName(name string) (pgxrecord.Field, error) {
+	switch name {
+	case `id`:
+		return &widget.ID, nil
+	case `name`:
+		return &widget.Name, nil
+	default:
+		return nil, errors.New("unknown attribute")
+	}
+}
+
+func (widget *Widget) SelectStatement() (*pgsql.SelectStatement, error) {
+	return pgsql.Select("widgets.id, widgets.name").From("widgets"), nil
 }
 
 func (widget *Widget) SelectScan(rows pgx.Rows) error {
@@ -205,9 +216,9 @@ func TestUpdateUpdates(t *testing.T) {
 func TestUpdateNotFound(t *testing.T) {
 	withTx(t, func(ctx context.Context, tx pgx.Tx) {
 		widget := &Widget{}
-		widget.ID.Set(42)
-		widget.Name.Set("sprocket")
-		err := pgxrecord.UpdateOne(ctx, tx, widget)
+		err := pgxrecord.AssignAttrs(widget, pgxrecord.AttrMap{"id": 42, "name": "sprocket"})
+		require.NoError(t, err)
+		err = pgxrecord.UpdateOne(ctx, tx, widget)
 		require.Error(t, err)
 		require.True(t, pgxrecord.NotFound(err))
 	})
@@ -374,6 +385,14 @@ func TestPgErrorMapper(t *testing.T) {
 		require.Error(t, err)
 		assert.Equal(t, "mapped error", err.Error())
 	})
+}
+
+func TestAssignAttrs(t *testing.T) {
+	widget := &Widget{}
+	err := pgxrecord.AssignAttrs(widget, pgxrecord.AttrMap{"id": 42, "name": "sprocket"})
+	assert.NoError(t, err)
+	assert.Equal(t, pgtype.Int4{Int: 42, Status: pgtype.Present}, widget.ID)
+	assert.Equal(t, pgtype.Text{String: "sprocket", Status: pgtype.Present}, widget.Name)
 }
 
 func BenchmarkSelectOne(b *testing.B) {

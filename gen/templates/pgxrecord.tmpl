@@ -16,26 +16,55 @@ type {{ .StructName }} struct {
 {{ range .Columns }}	{{ .FieldName }} {{ .FieldType }}
 {{ end }}}
 
-func ({{ .ReceiverName }} *{{ .StructName }}) InsertQuery() (sql string, queryArgs []interface{}) {
-	sql = `insert into {{ .TableName }}(
-{{ range $i, $c := .InsertColumns }}{{ if gt $i 0 }},
-{{ end }}  {{ .ColumnName }}{{ end }}
-) values (
-{{ range $i, $c := .InsertColumns }}{{ if gt $i 0 }},
-{{ end }}  ${{ add $i 1 }}{{ end }}
-){{ if .InsertReturningColumns }}
-returning
-{{ range $i, $c := .InsertReturningColumns }}{{ if gt $i 0 }},
-{{ end }}  {{ .ColumnName }}{{ end }}
-{{- end -}}
-`
+func ({{ .ReceiverName }} *{{ .StructName }}) FieldByColumnName(name string) (pgxrecord.Field, error) {
+	switch name {
+	{{ range .Columns -}}
+	case `{{ .ColumnName }}`:
+		return &{{ $G.ReceiverName }}.{{ .FieldName }}, nil
+	{{ end -}}
+	default:
+		return nil, errors.New("unknown attribute")
+	}
+}
 
-	queryArgs = []interface{}{
-		{{ range .InsertColumns -}}
-		{{ $G.ReceiverName }}.{{ .FieldName }},
-		{{ end }}}
+func ({{ .ReceiverName }} *{{ .StructName }}) AttrMap() pgxrecord.AttrMap {
+	m := make(pgxrecord.AttrMap, {{ len .Columns }})
 
-	return sql, queryArgs
+	var value interface{}
+
+	{{ range .Columns }}
+	value = {{ $G.ReceiverName }}.{{ .FieldName }}.Get()
+	if value != pgtype.Undefined {
+		m[`{{ .ColumnName }}`] = value
+	}
+	{{ end }}
+
+	return m
+}
+
+func ({{ .ReceiverName }} *{{ .StructName }}) InsertStatement() (*pgsql.InsertStatement, error) {
+	columns := make([]string, 0, {{ len .Columns }})
+	values := make([]interface{}, 0, {{ len .Columns }})
+
+	{{ range .Columns }}
+	if {{ $G.ReceiverName }}.{{ .FieldName }}.Status != pgtype.Undefined {
+		columns = append(columns, `{{ .ColumnName }}`)
+		values = append(values, {{ $G.ReceiverName }}.{{ .FieldName }})
+	}
+	{{ end }}
+
+	if len(columns) == 0 {
+		return nil, errors.New("no attributes to insert")
+	}
+
+	vs := pgsql.Values().Row(values...)
+	stmt := pgsql.Insert(`{{ .TableName }}`).Columns(columns...).Values(vs)
+
+	{{ range .InsertReturningColumns }}
+	stmt.Returning(`{{ .ColumnName }}`)
+	{{- end }}
+
+	return stmt, nil
 }
 
 {{ if .InsertReturningColumns }}
@@ -48,32 +77,46 @@ func ({{ .ReceiverName }} *{{ .StructName }}) InsertScan(rows pgx.Rows) error {
 }
 {{ end }}
 
-func ({{ .ReceiverName }} *{{ .StructName }}) UpdateData() ([]*pgsql.Assignment) {
-	assignments := make([]*pgsql.Assignment, 0, {{ len .Columns }})
+func ({{ .ReceiverName }} *{{ .StructName }}) UpdateStatement() (*pgsql.UpdateStatement, error) {
+	assignments := make(pgsql.Assignments, 0, {{ len .Columns }})
 
-	{{ range $i, $c := .Columns }}
+	{{ range .Columns }}
+	{{ if not .PrimaryKey }}
 	if {{ $G.ReceiverName }}.{{ .FieldName }}.Status != pgtype.Undefined {
 		assignments = append(assignments, &pgsql.Assignment{Left: pgsql.Ident{`{{ .ColumnName }}`}, Right: pgsql.Param{Value: {{ $G.ReceiverName }}.{{ .FieldName }}}})
 	}
 	{{ end }}
+	{{ end }}
 
-	return assignments
-}
+	if len(assignments) == 0 {
+		return nil, errors.New("no attributes to update")
+	}
 
-func ({{ .ReceiverName }} *{{ .StructName }}) TableName() string {
-	return `{{ .TableName }}`
-}
-
-func ({{ .ReceiverName }} *{{ .StructName }}) WherePrimaryKey() (*pgsql.SelectStatement) {
-	s := &pgsql.SelectStatement{}
+	stmt := pgsql.Update(`{{ .TableName }}`).Set(assignments)
 	{{ range .PrimaryKeyColumns -}}
-	s.Where("{{ .ColumnName }}=?", {{ $G.ReceiverName }}.{{ .FieldName }})
+	if {{ $G.ReceiverName }}.{{ .FieldName }}.Status != pgtype.Present {
+		return nil, errors.New("primary key not set")
+	}
+	stmt.Where("{{ .ColumnName }}=?", {{ $G.ReceiverName }}.{{ .FieldName }})
 	{{ end -}}
-	return s
+
+	return stmt, nil
 }
 
-func ({{ .ReceiverName }} *{{ .StructName }}) SelectStatement() *pgsql.SelectStatement {
-	return pgsql.Select(`{{ range $i, $c := .SelectColumns }}{{ if gt $i 0 }}, {{ end }}{{ $G.TableName}}.{{ .ColumnName }}{{ end }}`).From(`{{ .TableName }}`)
+func ({{ .ReceiverName }} *{{ .StructName }}) DeleteStatement() (*pgsql.DeleteStatement, error) {
+	stmt := pgsql.Delete(`{{ .TableName }}`)
+	{{ range .PrimaryKeyColumns -}}
+	if {{ $G.ReceiverName }}.{{ .FieldName }}.Status != pgtype.Present {
+		return nil, errors.New("primary key not set")
+	}
+	stmt.Where("{{ .ColumnName }}=?", {{ $G.ReceiverName }}.{{ .FieldName }})
+	{{ end -}}
+
+	return stmt, nil
+}
+
+func ({{ .ReceiverName }} *{{ .StructName }}) SelectStatement() (*pgsql.SelectStatement, error) {
+	return pgsql.Select(`{{ range $i, $c := .SelectColumns }}{{ if gt $i 0 }}, {{ end }}{{ $G.TableName}}.{{ .ColumnName }}{{ end }}`).From(`{{ .TableName }}`), nil
 }
 
 func ({{ .ReceiverName }} *{{ .StructName }}) SelectScan(rows pgx.Rows) error {
