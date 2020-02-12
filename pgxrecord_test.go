@@ -110,8 +110,12 @@ func (widget *Widget) UpdateStatement() (*pgsql.UpdateStatement, error) {
 	return pgsql.Update("widgets").Set(assignments).Where("id=?", widget.ID), nil
 }
 
-func (widget *Widget) DeleteStatement() *pgsql.DeleteStatement {
-	return pgsql.Delete("widgets").Where("id=?", widget.ID)
+func (widget *Widget) DeleteStatement() (*pgsql.DeleteStatement, error) {
+	if widget.ID.Status == pgtype.Undefined {
+		return nil, errors.New("primary key not set")
+	}
+
+	return pgsql.Delete("widgets").Where("id=?", widget.ID), nil
 }
 
 func (widget *Widget) MapPgError(*pgconn.PgError) error {
@@ -275,12 +279,6 @@ func TestDeleteNotFound(t *testing.T) {
 	})
 }
 
-type widgetDeletesTooMany Widget
-
-func (widget *widgetDeletesTooMany) DeleteStatement() *pgsql.DeleteStatement {
-	return pgsql.Delete("widgets")
-}
-
 func TestDeleteTooMany(t *testing.T) {
 	withTx(t, func(ctx context.Context, tx pgx.Tx) {
 		err := pgxrecord.Insert(ctx, tx, &Widget{Name: pgtype.Text{String: "sprocket", Status: pgtype.Present}})
@@ -288,8 +286,7 @@ func TestDeleteTooMany(t *testing.T) {
 		err = pgxrecord.Insert(ctx, tx, &Widget{Name: pgtype.Text{String: "device", Status: pgtype.Present}})
 		require.NoError(t, err)
 
-		widget := &widgetDeletesTooMany{}
-		err = pgxrecord.Delete(ctx, tx, widget)
+		err = pgxrecord.Delete(ctx, tx, pgsql.Delete("widgets"))
 		require.Error(t, err)
 		require.Equal(t, "expected 1 row got 2", err.Error())
 	})

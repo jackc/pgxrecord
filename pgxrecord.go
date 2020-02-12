@@ -41,7 +41,7 @@ type Updater interface {
 }
 
 type Deleter interface {
-	DeleteStatement() *pgsql.DeleteStatement
+	DeleteStatement() (*pgsql.DeleteStatement, error)
 }
 
 type Selector interface {
@@ -140,7 +140,10 @@ func Update(ctx context.Context, db Queryer, record Updater) error {
 
 // Delete deletes record in db. If the delete query does affect exactly one record an error will be returned.
 func Delete(ctx context.Context, db Queryer, record Deleter) error {
-	stmt := record.DeleteStatement()
+	stmt, err := record.DeleteStatement()
+	if err != nil {
+		return err
+	}
 	sql, args := pgsql.Build(stmt)
 	return queryOne(ctx, db, record, sql, args, nil)
 }
