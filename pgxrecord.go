@@ -14,19 +14,6 @@ type Queryer interface {
 	Query(ctx context.Context, sql string, optionsAndArgs ...interface{}) (pgx.Rows, error)
 }
 
-type Op int8
-
-const (
-	unspecifiedOp Op = iota
-	InsertOp
-	UpdateOp
-)
-
-type BeforeSaver interface {
-	// BeforeSave returns an error if the operation should be canceled. op is either InsertOp or UpdateOp.
-	BeforeSave(op Op) error
-}
-
 type Inserter interface {
 	InsertStatement() (*pgsql.InsertStatement, error)
 }
@@ -96,16 +83,8 @@ func NotFound(err error) bool {
 	return ok
 }
 
-// Insert inserts record into db. If record implements BeforeSaver then BeforeSave will be called. If an error is
-// returned the Insert is aborted.
+// Insert inserts record into db.
 func Insert(ctx context.Context, db Queryer, record Inserter) error {
-	if bs, ok := record.(BeforeSaver); ok {
-		err := bs.BeforeSave(InsertOp)
-		if err != nil {
-			return err
-		}
-	}
-
 	stmt, err := record.InsertStatement()
 	if err != nil {
 		return err
@@ -120,16 +99,8 @@ func Insert(ctx context.Context, db Queryer, record Inserter) error {
 	return queryOne(ctx, db, record, sql, args, f)
 }
 
-// Update updates record in db. If record implements BeforeSaver then BeforeSave will be called. If an error is
-// returned the Update is aborted. If the update query does not affect exactly one record an error will be returned.
+// Update updates record in db. If the update query does not affect exactly one record an error will be returned.
 func Update(ctx context.Context, db Queryer, record Updater) error {
-	if bs, ok := record.(BeforeSaver); ok {
-		err := bs.BeforeSave(UpdateOp)
-		if err != nil {
-			return err
-		}
-	}
-
 	stmt, err := record.UpdateStatement()
 	if err != nil {
 		return err

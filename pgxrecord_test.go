@@ -6,8 +6,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/jackc/imperator/normalize"
-	"github.com/jackc/imperator/validate"
 	"github.com/jackc/pgconn"
 	"github.com/jackc/pgsql"
 	"github.com/jackc/pgtype"
@@ -46,16 +44,6 @@ func closeConn(t testing.TB, conn *pgx.Conn) {
 type Widget struct {
 	ID   pgtype.Int4
 	Name pgtype.Text
-}
-
-func (widget *Widget) BeforeSave(op pgxrecord.Op) error {
-	if widget.Name.Status == pgtype.Present {
-		widget.Name.String = normalize.TextField(widget.Name.String)
-	}
-
-	v := &validate.Validator{}
-	v.Presence("name", widget.Name.String)
-	return v.Errors()
 }
 
 func (widget *Widget) SelectStatement() *pgsql.SelectStatement {
@@ -150,19 +138,6 @@ func TestInsertInserts(t *testing.T) {
 		err = tx.QueryRow(ctx, "select count(*) from widgets").Scan(&n)
 		require.NoError(t, err)
 		assert.Equal(t, 1, n)
-	})
-}
-
-func TestInsertCallsBeforeSave(t *testing.T) {
-	withTx(t, func(ctx context.Context, tx pgx.Tx) {
-		widget := &Widget{}
-		err := pgxrecord.Insert(ctx, tx, widget)
-		assert.Error(t, err)
-
-		var n int
-		err = tx.QueryRow(ctx, "select count(*) from widgets").Scan(&n)
-		require.NoError(t, err)
-		assert.Equal(t, 0, n)
 	})
 }
 
