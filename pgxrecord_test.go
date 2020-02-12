@@ -96,8 +96,8 @@ func (widget *Widget) InsertScan(rows pgx.Rows) error {
 	return rows.Scan(&widget.ID)
 }
 
-func (widget *Widget) UpdateData() []*pgsql.Assignment {
-	assignments := make([]*pgsql.Assignment, 0, 2)
+func (widget *Widget) UpdateStatement() *pgsql.UpdateStatement {
+	assignments := make(pgsql.Assignments, 0, 2)
 
 	if widget.ID.Status != pgtype.Undefined {
 		assignments = append(assignments, &pgsql.Assignment{Left: pgsql.Ident{`id`}, Right: pgsql.Param{Value: widget.ID}})
@@ -107,7 +107,7 @@ func (widget *Widget) UpdateData() []*pgsql.Assignment {
 		assignments = append(assignments, &pgsql.Assignment{Left: pgsql.Ident{`name`}, Right: pgsql.Param{Value: widget.Name}})
 	}
 
-	return assignments
+	return pgsql.Update("widgets").Set(assignments).Where("id=?", widget.ID)
 }
 
 func (widget *Widget) MapPgError(*pgconn.PgError) error {
@@ -232,26 +232,13 @@ func TestUpdateNotFound(t *testing.T) {
 
 type widgetUpdatesTooMany Widget
 
-func (widget *widgetUpdatesTooMany) TableName() string {
-	return "widgets"
-}
+func (widget *widgetUpdatesTooMany) UpdateStatement() *pgsql.UpdateStatement {
+	assignments := make(pgsql.Assignments, 0, 2)
 
-func (widget *widgetUpdatesTooMany) WherePrimaryKey() *pgsql.SelectStatement {
-	return pgsql.Where("true")
-}
+	assignments = append(assignments, &pgsql.Assignment{Left: pgsql.Ident{`id`}, Right: pgsql.Ident{`id`}})
+	assignments = append(assignments, &pgsql.Assignment{Left: pgsql.Ident{`name`}, Right: pgsql.Ident{`name`}})
 
-func (widget *widgetUpdatesTooMany) UpdateData() []*pgsql.Assignment {
-	assignments := make([]*pgsql.Assignment, 0, 2)
-
-	if widget.ID.Status != pgtype.Undefined {
-		assignments = append(assignments, &pgsql.Assignment{Left: pgsql.Ident{`id`}, Right: pgsql.Ident{`id`}})
-	}
-
-	if widget.Name.Status != pgtype.Undefined {
-		assignments = append(assignments, &pgsql.Assignment{Left: pgsql.Ident{`name`}, Right: pgsql.Ident{`id`}})
-	}
-
-	return assignments
+	return pgsql.Update("widgets").Set(assignments)
 }
 
 func TestUpdateTooMany(t *testing.T) {
