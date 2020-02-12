@@ -92,7 +92,7 @@ func (widget *Widget) InsertScan(rows pgx.Rows) error {
 	return rows.Scan(&widget.ID)
 }
 
-func (widget *Widget) UpdateStatement() *pgsql.UpdateStatement {
+func (widget *Widget) UpdateStatement() (*pgsql.UpdateStatement, error) {
 	assignments := make(pgsql.Assignments, 0, 2)
 
 	if widget.ID.Status != pgtype.Undefined {
@@ -103,7 +103,11 @@ func (widget *Widget) UpdateStatement() *pgsql.UpdateStatement {
 		assignments = append(assignments, &pgsql.Assignment{Left: pgsql.Ident{`name`}, Right: pgsql.Param{Value: widget.Name}})
 	}
 
-	return pgsql.Update("widgets").Set(assignments).Where("id=?", widget.ID)
+	if len(assignments) == 0 {
+		return nil, errors.New("no attributes to update")
+	}
+
+	return pgsql.Update("widgets").Set(assignments).Where("id=?", widget.ID), nil
 }
 
 func (widget *Widget) DeleteStatement() *pgsql.DeleteStatement {
@@ -230,17 +234,6 @@ func TestUpdateNotFound(t *testing.T) {
 	})
 }
 
-type widgetUpdatesTooMany Widget
-
-func (widget *widgetUpdatesTooMany) UpdateStatement() *pgsql.UpdateStatement {
-	assignments := make(pgsql.Assignments, 0, 2)
-
-	assignments = append(assignments, &pgsql.Assignment{Left: pgsql.Ident{`id`}, Right: pgsql.Ident{`id`}})
-	assignments = append(assignments, &pgsql.Assignment{Left: pgsql.Ident{`name`}, Right: pgsql.Ident{`name`}})
-
-	return pgsql.Update("widgets").Set(assignments)
-}
-
 func TestUpdateTooMany(t *testing.T) {
 	withTx(t, func(ctx context.Context, tx pgx.Tx) {
 		err := pgxrecord.Insert(ctx, tx, &Widget{Name: pgtype.Text{String: "sprocket", Status: pgtype.Present}})
@@ -248,8 +241,7 @@ func TestUpdateTooMany(t *testing.T) {
 		err = pgxrecord.Insert(ctx, tx, &Widget{Name: pgtype.Text{String: "device", Status: pgtype.Present}})
 		require.NoError(t, err)
 
-		widget := &widgetUpdatesTooMany{Name: pgtype.Text{String: "lever", Status: pgtype.Present}}
-		err = pgxrecord.Update(ctx, tx, widget)
+		err = pgxrecord.Update(ctx, tx, pgsql.Update("widgets").Setf("name=name"))
 		require.Error(t, err)
 		require.Equal(t, "expected 1 row got 2", err.Error())
 	})

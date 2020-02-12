@@ -37,7 +37,7 @@ type InsertScanner interface {
 }
 
 type Updater interface {
-	UpdateStatement() *pgsql.UpdateStatement
+	UpdateStatement() (*pgsql.UpdateStatement, error)
 }
 
 type Deleter interface {
@@ -130,7 +130,10 @@ func Update(ctx context.Context, db Queryer, record Updater) error {
 		}
 	}
 
-	stmt := record.UpdateStatement()
+	stmt, err := record.UpdateStatement()
+	if err != nil {
+		return err
+	}
 	sql, args := pgsql.Build(stmt)
 	return queryOne(ctx, db, record, sql, args, nil)
 }
