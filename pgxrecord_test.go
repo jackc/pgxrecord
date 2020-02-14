@@ -327,11 +327,27 @@ func TestAssignAttrs(t *testing.T) {
 	assert.Equal(t, pgtype.Text{String: "sprocket", Status: pgtype.Present}, widget.Name)
 }
 
+func benchmarkInsertOne(b *testing.B, ctx context.Context, tx pgx.Tx) *Widget {
+	widget := &Widget{}
+	pgxrecord.AssignAttrs(widget, pgxrecord.AttrMap{
+		"name":       "sprocket",
+		"aaaaaaaaaa": "fajkfawjk",
+		"bbbbbbbbbb": "fasdjklsaf",
+		"cccccccccc": "rwehakjlsdaf",
+		"dddddddddd": time.Now(),
+		"eeeeeeeeee": time.Now(),
+		"ffffffffff": time.Now(),
+		"gggggggggg": 123456789,
+		"hhhhhhhhhh": 987,
+	})
+	err := pgxrecord.InsertOne(ctx, tx, widget)
+	require.NoError(b, err)
+	return widget
+}
+
 func BenchmarkSelectOne(b *testing.B) {
 	withTx(b, func(ctx context.Context, tx pgx.Tx) {
-		widget := &Widget{Name: pgtype.Text{String: "sprocket", Status: pgtype.Present}}
-		err := pgxrecord.InsertOne(ctx, tx, widget)
-		require.NoError(b, err)
+		widget := benchmarkInsertOne(b, ctx, tx)
 
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
@@ -346,14 +362,12 @@ func BenchmarkSelectOne(b *testing.B) {
 
 func BenchmarkSelectOnePgx(b *testing.B) {
 	withTx(b, func(ctx context.Context, tx pgx.Tx) {
-		widget := &Widget{Name: pgtype.Text{String: "sprocket", Status: pgtype.Present}}
-		err := pgxrecord.InsertOne(ctx, tx, widget)
-		require.NoError(b, err)
+		widget := benchmarkInsertOne(b, ctx, tx)
 
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
 			w := &Widget{}
-			err = tx.QueryRow(
+			err := tx.QueryRow(
 				ctx,
 				"select id, name, aaaaaaaaaa, bbbbbbbbbb, cccccccccc, dddddddddd, eeeeeeeeee, ffffffffff, gggggggggg, hhhhhhhhhh from widgets where id=$1",
 				widget.ID,
