@@ -6,7 +6,6 @@ import (
 
 	"github.com/jackc/pgsql"
 	"github.com/jackc/pgtype"
-	"github.com/jackc/pgx/v4"
 	"github.com/jackc/pgxrecord"
 )
 
@@ -178,12 +177,6 @@ func (row *Widget) InsertStatement() (*pgsql.InsertStatement, error) {
 	return stmt, nil
 }
 
-func (row *Widget) InsertScan(rows pgx.Rows) error {
-	return rows.Scan(
-		&row.ID,
-	)
-}
-
 func (row *Widget) UpdateStatement() (*pgsql.UpdateStatement, error) {
 	assignments := make(pgsql.Assignments, 0, 10)
 
@@ -246,21 +239,6 @@ func (row *Widget) DeleteStatement() (*pgsql.DeleteStatement, error) {
 
 func (row *Widget) SelectStatement() (*pgsql.SelectStatement, error) {
 	return pgsql.Select(`widgets.id, widgets.name, widgets.aaaaaaaaaa, widgets.bbbbbbbbbb, widgets.cccccccccc, widgets.dddddddddd, widgets.eeeeeeeeee, widgets.ffffffffff, widgets.gggggggggg, widgets.hhhhhhhhhh`).From(`widgets`), nil
-}
-
-func (row *Widget) SelectScan(rows pgx.Rows) error {
-	return rows.Scan(
-		&row.ID,
-		&row.Name,
-		&row.Aaaaaaaaaa,
-		&row.Bbbbbbbbbb,
-		&row.Cccccccccc,
-		&row.Dddddddddd,
-		&row.Eeeeeeeeee,
-		&row.Ffffffffff,
-		&row.Gggggggggg,
-		&row.Hhhhhhhhhh,
-	)
 }
 
 type WidgetCollection []*Widget

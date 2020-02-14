@@ -73,16 +73,6 @@ func ({{ .ReceiverName }} *{{ .StructName }}) InsertStatement() (*pgsql.InsertSt
 	return stmt, nil
 }
 
-{{ if .InsertReturningColumns }}
-func ({{ .ReceiverName }} *{{ .StructName }}) InsertScan(rows pgx.Rows) error {
-	return rows.Scan(
-		{{ range .InsertReturningColumns -}}
-		&{{ $G.ReceiverName }}.{{ .FieldName }},
-		{{ end -}}
-	)
-}
-{{ end }}
-
 func ({{ .ReceiverName }} *{{ .StructName }}) UpdateStatement() (*pgsql.UpdateStatement, error) {
 	assignments := make(pgsql.Assignments, 0, {{ len .Columns }})
 
@@ -123,13 +113,6 @@ func ({{ .ReceiverName }} *{{ .StructName }}) DeleteStatement() (*pgsql.DeleteSt
 
 func ({{ .ReceiverName }} *{{ .StructName }}) SelectStatement() (*pgsql.SelectStatement, error) {
 	return pgsql.Select(`{{ range $i, $c := .Columns }}{{ if gt $i 0 }}, {{ end }}{{ $G.TableName}}.{{ .ColumnName }}{{ end }}`).From(`{{ .TableName }}`), nil
-}
-
-func ({{ .ReceiverName }} *{{ .StructName }}) SelectScan(rows pgx.Rows) error {
-	return rows.Scan(
-		{{ range .Columns -}}
-		&{{ $G.ReceiverName }}.{{ .FieldName }},
-		{{ end }})
 }
 
 type {{ .StructName }}Collection []*{{ .StructName }}

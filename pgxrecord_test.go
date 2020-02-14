@@ -301,10 +301,6 @@ func (row *widgetMappedError) InsertStatement() (*pgsql.InsertStatement, error) 
 	return (*Widget)(row).InsertStatement()
 }
 
-func (row *widgetMappedError) InsertScan(rows pgx.Rows) error {
-	return (*Widget)(row).InsertScan(rows)
-}
-
 func (row *widgetMappedError) MapPgError(*pgconn.PgError) error {
 	return errors.New("mapped error")
 }
