@@ -28,8 +28,16 @@ func withTx(t testing.TB, f func(ctx context.Context, tx pgx.Tx)) {
 	defer tx.Rollback(ctx)
 
 	conn.Exec(ctx, `create temporary table widgets (
-	id serial primary key,
-	name text not null unique
+  id serial primary key,
+  name text not null unique,
+  aaaaaaaaaa text,
+  bbbbbbbbbb text,
+  cccccccccc text,
+  dddddddddd timestamptz,
+  eeeeeeeeee timestamptz,
+  ffffffffff date,
+  gggggggggg bigint,
+  hhhhhhhhhh int
 );`)
 
 	f(ctx, tx)
@@ -39,96 +47,6 @@ func closeConn(t testing.TB, conn *pgx.Conn) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	require.NoError(t, conn.Close(ctx))
-}
-
-type Widget struct {
-	ID   pgtype.Int4
-	Name pgtype.Text
-}
-
-func (widget *Widget) FieldByColumnName(name string) (pgxrecord.Field, error) {
-	switch name {
-	case `id`:
-		return &widget.ID, nil
-	case `name`:
-		return &widget.Name, nil
-	default:
-		return nil, errors.New("unknown attribute")
-	}
-}
-
-func (widget *Widget) SelectStatement() (*pgsql.SelectStatement, error) {
-	return pgsql.Select("widgets.id, widgets.name").From("widgets"), nil
-}
-
-func (widget *Widget) SelectScan(rows pgx.Rows) error {
-	return rows.Scan(&widget.ID, &widget.Name)
-}
-
-func (widget *Widget) InsertStatement() (*pgsql.InsertStatement, error) {
-	columns := make([]string, 0, 2)
-	values := make([]interface{}, 0, 2)
-
-	if widget.ID.Status != pgtype.Undefined {
-		columns = append(columns, "id")
-		values = append(values, widget.ID)
-	}
-
-	if widget.Name.Status != pgtype.Undefined {
-		columns = append(columns, "name")
-		values = append(values, widget.Name)
-	}
-
-	if len(columns) == 0 {
-		return nil, errors.New("no attributes to insert")
-	}
-
-	vs := pgsql.Values().Row(values...)
-	return pgsql.Insert("widgets").Columns(columns...).Values(vs).Returning("id"), nil
-}
-
-func (widget *Widget) InsertScan(rows pgx.Rows) error {
-	return rows.Scan(&widget.ID)
-}
-
-func (widget *Widget) UpdateStatement() (*pgsql.UpdateStatement, error) {
-	assignments := make(pgsql.Assignments, 0, 2)
-
-	if widget.ID.Status != pgtype.Undefined {
-		assignments = append(assignments, &pgsql.Assignment{Left: pgsql.Ident{`id`}, Right: pgsql.Param{Value: widget.ID}})
-	}
-
-	if widget.Name.Status != pgtype.Undefined {
-		assignments = append(assignments, &pgsql.Assignment{Left: pgsql.Ident{`name`}, Right: pgsql.Param{Value: widget.Name}})
-	}
-
-	if len(assignments) == 0 {
-		return nil, errors.New("no attributes to update")
-	}
-
-	return pgsql.Update("widgets").Set(assignments).Where("id=?", widget.ID), nil
-}
-
-func (widget *Widget) DeleteStatement() (*pgsql.DeleteStatement, error) {
-	if widget.ID.Status == pgtype.Undefined {
-		return nil, errors.New("primary key not set")
-	}
-
-	return pgsql.Delete("widgets").Where("id=?", widget.ID), nil
-}
-
-func (widget *Widget) MapPgError(*pgconn.PgError) error {
-	return errors.New("mapped error")
-}
-
-type WidgetCollection []*Widget
-
-func (c *WidgetCollection) NewRecord() pgxrecord.Selector {
-	return &Widget{}
-}
-
-func (c *WidgetCollection) Append(s pgxrecord.Selector) {
-	*c = append(*c, s.(*Widget))
 }
 
 func TestInsertInserts(t *testing.T) {
@@ -377,11 +295,25 @@ func TestSelectAllWhenNoResults(t *testing.T) {
 	})
 }
 
+type widgetMappedError Widget
+
+func (row *widgetMappedError) InsertStatement() (*pgsql.InsertStatement, error) {
+	return (*Widget)(row).InsertStatement()
+}
+
+func (row *widgetMappedError) InsertScan(rows pgx.Rows) error {
+	return (*Widget)(row).InsertScan(rows)
+}
+
+func (row *widgetMappedError) MapPgError(*pgconn.PgError) error {
+	return errors.New("mapped error")
+}
+
 func TestPgErrorMapper(t *testing.T) {
 	withTx(t, func(ctx context.Context, tx pgx.Tx) {
-		err := pgxrecord.InsertOne(ctx, tx, &Widget{Name: pgtype.Text{String: "sprocket", Status: pgtype.Present}})
+		err := pgxrecord.InsertOne(ctx, tx, &widgetMappedError{Name: pgtype.Text{String: "sprocket", Status: pgtype.Present}})
 		require.NoError(t, err)
-		err = pgxrecord.InsertOne(ctx, tx, &Widget{Name: pgtype.Text{String: "sprocket", Status: pgtype.Present}})
+		err = pgxrecord.InsertOne(ctx, tx, &widgetMappedError{Name: pgtype.Text{String: "sprocket", Status: pgtype.Present}})
 		require.Error(t, err)
 		assert.Equal(t, "mapped error", err.Error())
 	})
@@ -418,13 +350,25 @@ func BenchmarkSelectOnePgx(b *testing.B) {
 		err := pgxrecord.InsertOne(ctx, tx, widget)
 		require.NoError(b, err)
 
-		stmt := pgsql.Select("id, widgets").From("widgets").Where("id=?", widget.ID)
-		sql, args := pgsql.Build(stmt)
-
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
 			w := &Widget{}
-			err = tx.QueryRow(ctx, sql, args...).Scan(&w.ID, &w.Name)
+			err = tx.QueryRow(
+				ctx,
+				"select id, name, aaaaaaaaaa, bbbbbbbbbb, cccccccccc, dddddddddd, eeeeeeeeee, ffffffffff, gggggggggg, hhhhhhhhhh from widgets where id=$1",
+				widget.ID,
+			).Scan(
+				&w.ID,
+				&w.Name,
+				&w.Aaaaaaaaaa,
+				&w.Bbbbbbbbbb,
+				&w.Cccccccccc,
+				&w.Dddddddddd,
+				&w.Eeeeeeeeee,
+				&w.Ffffffffff,
+				&w.Gggggggggg,
+				&w.Hhhhhhhhhh,
+			)
 			if err != nil {
 				b.Fatal(err)
 			}
