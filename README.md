@@ -3,9 +3,9 @@
 
 # pgxrecord
 
-Package pgxrecord is a tiny framework for CRUD operations and data mapping.
+Package pgxrecord is a tiny framework for CRUD operations and data mapping. It is both a library and a code generation tool.
 
-It is not an ORM. It does not use reflection and it does not require code generation.
+It does not and will not have traditional ORM features such as associations, validation, and hooks. It's sole purpose is a simple way to read and write rows from the database.
 
 ## Package Status
 
@@ -53,54 +53,29 @@ err = pgxrecord.SelectOne(ctx, tx, widget, pgsql.Where("id=?", 42))
 err = pgxrecord.Delete(ctx, tx, widget)
 ```
 
-However, the price for strong typing, no reflection, and no code generation is writing SQL and data mapping code manually.
+For the above code to work, the `Widget` and `WidgetCollection` types need to be defined. These can be created automatically by the `pgxrecord` CLI tool.
 
-```go
-type Widget struct {
-	ID   int32
-	Name string
-}
+Install:
 
-func (widget *Widget) SelectStatement() *pgsql.SelectStatement {
-	return pgsql.Select("widgets.id, widgets.name").From("widgets")
-}
-
-func (widget *Widget) SelectScan(rows pgx.Rows) error {
-	return rows.Scan(&widget.ID, &widget.Name)
-}
-
-func (widget *Widget) InsertQuery() (sql string, queryArgs []interface{}) {
-	sql = "insert into widgets(name) values ($1) returning id"
-	queryArgs = []interface{}{widget.Name}
-	return sql, queryArgs
-}
-
-func (widget *Widget) InsertScan(rows pgx.Rows) error {
-	return rows.Scan(&widget.ID)
-}
-
-func (widget *Widget) UpdateQuery() (sql string, queryArgs []interface{}) {
-	sql = `update widgets set name=$1 where id=$2`
-	queryArgs = []interface{}{widget.Name, widget.ID}
-	return sql, queryArgs
-}
-
-func (widget *Widget) DeleteQuery() (sql string, queryArgs []interface{}) {
-	sql = `delete from widgets where id=$1`
-	queryArgs = []interface{}{widget.ID}
-	return sql, queryArgs
-}
-
-type WidgetCollection []*Widget
-
-func (c *WidgetCollection) NewRecord() pgxrecord.Selector {
-	return &Widget{}
-}
-
-func (c *WidgetCollection) Append(s pgxrecord.Selector) {
-	*c = append(*c, s.(*Widget))
-}
 ```
+go get github.com/jackc/pgxrecord/cmd/pgxrecord
+```
+
+Connect to database and introspect widgets table:
+
+```
+pgxrecord new widgets > widgets.json
+```
+
+Compile `widgets.json` into Go code:
+
+```
+pgxrecord compile widgets.json | goimports > widgets.go
+```
+
+`pgxrecord new` will use the standard `PG*` environment variables to determine what database to connect to or a URL can be specified as an argument.
+
+The produced JSON can be modified to change the mapping between Go and PostgreSQL names and types.
 
 ## Testing
 
