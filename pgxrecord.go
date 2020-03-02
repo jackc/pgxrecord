@@ -3,6 +3,7 @@ package pgxrecord
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 
@@ -82,8 +83,7 @@ func (e *notFoundError) Error() string {
 
 // NotFound returns true if err is a not found error.
 func NotFound(err error) bool {
-	_, ok := err.(*notFoundError)
-	return ok
+	return errors.Is(err, &notFoundError{})
 }
 
 // Insert inserts record into db. If the insert query does not affect exactly one record an error will be returned.

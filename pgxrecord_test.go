@@ -3,6 +3,7 @@ package pgxrecord_test
 import (
 	"context"
 	"errors"
+	"fmt"
 	"testing"
 	"time"
 
@@ -229,6 +230,16 @@ func TestSelectOneErrorWhenNotFound(t *testing.T) {
 		widget := &Widget{}
 		err := pgxrecord.SelectOne(ctx, tx, widget)
 		require.Error(t, err)
+		require.True(t, pgxrecord.NotFound(err))
+	})
+}
+
+func TestNotFoundUnwrapsError(t *testing.T) {
+	withTx(t, func(ctx context.Context, tx pgx.Tx) {
+		widget := &Widget{}
+		err := pgxrecord.SelectOne(ctx, tx, widget)
+		require.Error(t, err)
+		err = fmt.Errorf("some wrapping err: %w", err)
 		require.True(t, pgxrecord.NotFound(err))
 	})
 }
