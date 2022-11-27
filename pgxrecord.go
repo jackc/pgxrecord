@@ -36,6 +36,7 @@ type Table struct {
 	selectQuery         string
 	selectByPKQuery     string
 	pkWhereClause       string
+	returningClause     string
 	pkIndexes           []int
 	nameToColumnIndex   map[string]int
 }
@@ -128,6 +129,7 @@ func (t *Table) Finalize() {
 	t.pkWhereClause = t.buildPKWhereClause()
 	t.selectQuery = t.buildSelectQuery()
 	t.selectByPKQuery = t.selectQuery + " " + t.pkWhereClause
+	t.returningClause = t.buildReturningClause()
 	t.nameToColumnIndex = buildNameToColumnIndex(t.Columns)
 }
 
@@ -159,6 +161,19 @@ func (t *Table) buildPKWhereClause() string {
 		b.WriteString(c.quotedName)
 		b.WriteString(" = $")
 		b.WriteString(strconv.FormatInt(int64(i+1), 10))
+	}
+
+	return b.String()
+}
+
+func (t *Table) buildReturningClause() string {
+	b := &strings.Builder{}
+	b.WriteString("returning ")
+	for i, c := range t.Columns {
+		if i > 0 {
+			b.WriteString(", ")
+		}
+		b.WriteString(c.quotedName)
 	}
 
 	return b.String()
@@ -359,13 +374,8 @@ func (r *Record) insert(ctx context.Context, db DB) error {
 		}
 	}
 
-	b.WriteString(") returning ")
-	for i, c := range r.table.Columns {
-		if i > 0 {
-			b.WriteString(", ")
-		}
-		b.WriteString(c.quotedName)
-	}
+	b.WriteString(") ")
+	b.WriteString(r.table.returningClause)
 
 	ptrsToAttributes := make([]any, len(r.attributes))
 	for i := range r.attributes {
@@ -414,13 +424,8 @@ func (r *Record) update(ctx context.Context, db DB) error {
 	b.WriteByte(' ')
 	b.WriteString(r.table.pkWhereClause)
 
-	b.WriteString(" returning ")
-	for i, c := range r.table.Columns {
-		if i > 0 {
-			b.WriteString(", ")
-		}
-		b.WriteString(c.quotedName)
-	}
+	b.WriteByte(' ')
+	b.WriteString(r.table.returningClause)
 
 	ptrsToAttributes := make([]any, len(r.attributes))
 	for i := range r.attributes {
