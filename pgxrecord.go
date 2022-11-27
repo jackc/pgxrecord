@@ -10,17 +10,13 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
-type databaseValue int64
-
-const DatabaseDefault = databaseValue(1)
-
-type Queryer interface {
+// DB is the interface pgxrecord uses to access the database. It is satisfied by *pgx.Conn, pgx.Tx, *pgxpool.Pool, etc.
+type DB interface {
 	Query(ctx context.Context, sql string, optionsAndArgs ...interface{}) (pgx.Rows, error)
 	QueryRow(ctx context.Context, sql string, optionsAndArgs ...interface{}) pgx.Row
 }
 
-var errTableUsed = fmt.Errorf("cannot call after table used")
-
+// Column represents a column in a table.
 type Column struct {
 	Name       string
 	quotedName string
@@ -29,10 +25,12 @@ type Column struct {
 	PrimaryKey bool
 }
 
+// Table represents a table in a database. It must not be mutated after Finalize is called.
 type Table struct {
-	Name                pgx.Identifier
-	Columns             []*Column
-	used                bool
+	Name    pgx.Identifier
+	Columns []*Column
+
+	finalized           bool
 	quotedQualifiedName string
 	quotedName          string
 	selectQuery         string
@@ -42,6 +40,7 @@ type Table struct {
 	nameToColumnIndex   map[string]int
 }
 
+// Record represents a row from a table in the database.
 type Record struct {
 	table              *Table
 	originalAttributes []any
@@ -49,9 +48,10 @@ type Record struct {
 	assigned           []bool
 }
 
-func (t *Table) LoadAllColumns(ctx context.Context, db Queryer) error {
-	if t.used {
-		return errTableUsed
+// LoadAllColumns queries the database for the table columns. It must not be called after Finalize.
+func (t *Table) LoadAllColumns(ctx context.Context, db DB) error {
+	if t.finalized {
+		panic("cannot call after table finalized")
 	}
 
 	var tableOID uint32
@@ -108,8 +108,13 @@ func (t *Table) LoadAllColumns(ctx context.Context, db Queryer) error {
 	return nil
 }
 
-func (t *Table) initialize() {
-	t.used = true
+// Finalize finishes the table initialization.
+func (t *Table) Finalize() {
+	if t.finalized {
+		panic("cannot call after table finalized")
+	}
+
+	t.finalized = true
 
 	t.quotedQualifiedName = t.Name.Sanitize()
 	t.quotedName = pgx.Identifier{t.Name[len(t.Name)-1]}.Sanitize()
@@ -185,9 +190,10 @@ func buildNameToColumnIndex(columns []*Column) map[string]int {
 	return m
 }
 
+// NewRecord creates an empty Record. It must be called after Finalize.
 func (t *Table) NewRecord() *Record {
-	if !t.used {
-		t.initialize()
+	if !t.finalized {
+		panic("cannot call until table finalized")
 	}
 
 	record := &Record{
@@ -199,17 +205,19 @@ func (t *Table) NewRecord() *Record {
 	return record
 }
 
+// SelectQuery returns the SQL query to select all rows from the table. It must be called after Finalize.
 func (t *Table) SelectQuery() string {
-	if !t.used {
-		t.initialize()
+	if !t.finalized {
+		panic("cannot call until table finalized")
 	}
 
 	return t.selectQuery
 }
 
-func (t *Table) FindByPK(ctx context.Context, db Queryer, pk ...any) (*Record, error) {
-	if !t.used {
-		t.initialize()
+// FindByPK finds a record by primary key. It must be called after Finalize.
+func (t *Table) FindByPK(ctx context.Context, db DB, pk ...any) (*Record, error) {
+	if !t.finalized {
+		panic("cannot call until table finalized")
 	}
 
 	rows, _ := db.Query(ctx, t.selectByPKQuery, pk...)
@@ -221,9 +229,10 @@ func (t *Table) FindByPK(ctx context.Context, db Queryer, pk ...any) (*Record, e
 	return record, nil
 }
 
+// RowToRecord is a pgx.RowToFunc that returns a *Record. It must be called after Finalize.
 func (t *Table) RowToRecord(row pgx.CollectableRow) (*Record, error) {
-	if !t.used {
-		t.initialize()
+	if !t.finalized {
+		panic("cannot call until table finalized")
 	}
 
 	record := t.NewRecord()
@@ -244,10 +253,11 @@ func (t *Table) RowToRecord(row pgx.CollectableRow) (*Record, error) {
 	return record, nil
 }
 
-func (r *Record) Set(key string, value any) error {
-	idx, ok := r.table.nameToColumnIndex[key]
+// Set sets a attribute to a value.
+func (r *Record) Set(attribute string, value any) error {
+	idx, ok := r.table.nameToColumnIndex[attribute]
 	if !ok {
-		return fmt.Errorf("attribute %q is not found", key)
+		return fmt.Errorf("attribute %q is not found", attribute)
 	}
 
 	r.attributes[idx] = value
@@ -256,30 +266,34 @@ func (r *Record) Set(key string, value any) error {
 	return nil
 }
 
-func (r *Record) MustSet(key string, value any) {
-	err := r.Set(key, value)
+// MustSet sets a attribute to a value. It panics on failure.
+func (r *Record) MustSet(attribute string, value any) {
+	err := r.Set(attribute, value)
 	if err != nil {
 		panic(err.Error())
 	}
 }
 
-func (r *Record) Get(key string) (any, error) {
-	idx, ok := r.table.nameToColumnIndex[key]
+// Get returns the value of attribute.
+func (r *Record) Get(attribute string) (any, error) {
+	idx, ok := r.table.nameToColumnIndex[attribute]
 	if !ok {
-		return nil, fmt.Errorf("attribute %q is not found", key)
+		return nil, fmt.Errorf("attribute %q is not found", attribute)
 	}
 
 	return r.attributes[idx], nil
 }
 
-func (r *Record) MustGet(key string) any {
-	value, err := r.Get(key)
+// MustGet returns the value of attribute. It panics on failure.
+func (r *Record) MustGet(attribute string) any {
+	value, err := r.Get(attribute)
 	if err != nil {
 		panic(err.Error())
 	}
 	return value
 }
 
+// SetAttributes sets attributes.
 func (r *Record) SetAttributes(attributes map[string]any) error {
 	for k, v := range attributes {
 		idx, ok := r.table.nameToColumnIndex[k]
@@ -294,6 +308,7 @@ func (r *Record) SetAttributes(attributes map[string]any) error {
 	return nil
 }
 
+// Attributes returns all attributes.
 func (r *Record) Attributes() map[string]any {
 	m := make(map[string]any, len(r.attributes))
 	for i := range r.table.Columns {
@@ -303,7 +318,8 @@ func (r *Record) Attributes() map[string]any {
 	return m
 }
 
-func (r *Record) Save(ctx context.Context, db Queryer) error {
+// Save saves the record using db.
+func (r *Record) Save(ctx context.Context, db DB) error {
 	if r.originalAttributes == nil {
 		return r.insert(ctx, db)
 	} else {
@@ -311,7 +327,7 @@ func (r *Record) Save(ctx context.Context, db Queryer) error {
 	}
 }
 
-func (r *Record) insert(ctx context.Context, db Queryer) error {
+func (r *Record) insert(ctx context.Context, db DB) error {
 	b := &strings.Builder{}
 	b.WriteString("insert into ")
 	b.WriteString(r.table.quotedQualifiedName)
@@ -370,7 +386,7 @@ func (r *Record) insert(ctx context.Context, db Queryer) error {
 	return nil
 }
 
-func (r *Record) update(ctx context.Context, db Queryer) error {
+func (r *Record) update(ctx context.Context, db DB) error {
 	b := &strings.Builder{}
 	b.WriteString("update ")
 	b.WriteString(r.table.quotedQualifiedName)

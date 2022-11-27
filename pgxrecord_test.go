@@ -42,6 +42,7 @@ func TestTableLoadAllColumns(t *testing.T) {
 		}
 		err = table.LoadAllColumns(ctx, tx)
 		require.NoError(t, err)
+		table.Finalize()
 
 		require.Len(t, table.Columns, 3)
 		expectedColumns := []pgxrecord.Column{
@@ -76,6 +77,7 @@ func TestTableSelectQuery(t *testing.T) {
 		}
 		err = table.LoadAllColumns(ctx, tx)
 		require.NoError(t, err)
+		table.Finalize()
 
 		require.Equal(t, `select "t"."id", "t"."name", "t"."age" from "t"`, table.SelectQuery())
 	})
@@ -99,6 +101,7 @@ func TestTableNewRecord(t *testing.T) {
 		}
 		err = table.LoadAllColumns(ctx, tx)
 		require.NoError(t, err)
+		table.Finalize()
 
 		record := table.NewRecord()
 		require.Equal(t, map[string]any{"id": nil, "name": nil, "age": nil}, record.Attributes())
@@ -130,6 +133,7 @@ func TestTableFindByPK(t *testing.T) {
 		}
 		err = table.LoadAllColumns(ctx, tx)
 		require.NoError(t, err)
+		table.Finalize()
 
 		record, err := table.FindByPK(ctx, conn, id)
 		require.NoError(t, err)
@@ -155,6 +159,7 @@ func TestRecordSetAndGet(t *testing.T) {
 		}
 		err = table.LoadAllColumns(ctx, tx)
 		require.NoError(t, err)
+		table.Finalize()
 
 		record := table.NewRecord()
 
@@ -185,6 +190,7 @@ func TestRecordSaveInsert(t *testing.T) {
 		}
 		err = table.LoadAllColumns(ctx, tx)
 		require.NoError(t, err)
+		table.Finalize()
 
 		record := table.NewRecord()
 		record.SetAttributes(map[string]any{"name": "John", "age": 42})
@@ -217,6 +223,7 @@ func TestRecordSaveUpdate(t *testing.T) {
 		}
 		err = table.LoadAllColumns(ctx, tx)
 		require.NoError(t, err)
+		table.Finalize()
 
 		record, err := table.FindByPK(ctx, conn, id)
 		require.NoError(t, err)
