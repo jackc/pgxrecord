@@ -335,14 +335,35 @@ func (r *Record) Attributes() map[string]any {
 
 // Save saves the record using db.
 func (r *Record) Save(ctx context.Context, db DB) error {
+	var sql string
+	var args []any
+
 	if r.originalAttributes == nil {
-		return r.insert(ctx, db)
+		sql, args = r.insert(ctx, db)
 	} else {
-		return r.update(ctx, db)
+		sql, args = r.update(ctx, db)
 	}
+
+	ptrsToAttributes := make([]any, len(r.attributes))
+	for i := range r.attributes {
+		ptrsToAttributes[i] = &r.attributes[i]
+	}
+
+	err := db.QueryRow(ctx, sql, args...).Scan(ptrsToAttributes...)
+	if err != nil {
+		return err
+	}
+
+	r.originalAttributes = make([]any, len(r.attributes))
+	copy(r.originalAttributes, r.attributes)
+	for i := range r.assigned {
+		r.assigned[i] = false
+	}
+
+	return nil
 }
 
-func (r *Record) insert(ctx context.Context, db DB) error {
+func (r *Record) insert(ctx context.Context, db DB) (string, []any) {
 	b := &strings.Builder{}
 	b.WriteString("insert into ")
 	b.WriteString(r.table.quotedQualifiedName)
@@ -377,26 +398,10 @@ func (r *Record) insert(ctx context.Context, db DB) error {
 	b.WriteString(") ")
 	b.WriteString(r.table.returningClause)
 
-	ptrsToAttributes := make([]any, len(r.attributes))
-	for i := range r.attributes {
-		ptrsToAttributes[i] = &r.attributes[i]
-	}
-
-	err := db.QueryRow(ctx, b.String(), args...).Scan(ptrsToAttributes...)
-	if err != nil {
-		return err
-	}
-
-	r.originalAttributes = make([]any, len(r.attributes))
-	copy(r.originalAttributes, r.attributes)
-	for i := range r.assigned {
-		r.assigned[i] = false
-	}
-
-	return nil
+	return b.String(), args
 }
 
-func (r *Record) update(ctx context.Context, db DB) error {
+func (r *Record) update(ctx context.Context, db DB) (string, []any) {
 	b := &strings.Builder{}
 	b.WriteString("update ")
 	b.WriteString(r.table.quotedQualifiedName)
@@ -427,21 +432,5 @@ func (r *Record) update(ctx context.Context, db DB) error {
 	b.WriteByte(' ')
 	b.WriteString(r.table.returningClause)
 
-	ptrsToAttributes := make([]any, len(r.attributes))
-	for i := range r.attributes {
-		ptrsToAttributes[i] = &r.attributes[i]
-	}
-
-	err := db.QueryRow(ctx, b.String(), args...).Scan(ptrsToAttributes...)
-	if err != nil {
-		return err
-	}
-
-	r.originalAttributes = make([]any, len(r.attributes))
-	copy(r.originalAttributes, r.attributes)
-	for i := range r.assigned {
-		r.assigned[i] = false
-	}
-
-	return nil
+	return b.String(), args
 }
