@@ -10,7 +10,7 @@ jobs:
 
   test:
     name: Test
-    runs-on: ubuntu-22.0422.04
+    runs-on: ubuntu-22.04
 
     steps:
 
