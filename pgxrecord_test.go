@@ -239,6 +239,43 @@ func TestRecordSaveUpdate(t *testing.T) {
 	})
 }
 
+func TestSelect(t *testing.T) {
+	defaultConnTestRunner.RunTest(context.Background(), t, func(ctx context.Context, t testing.TB, conn *pgx.Conn) {
+		type Person struct {
+			ID   int32
+			Name string
+			Age  int32
+		}
+
+		people, err := pgxrecord.Select(ctx, conn, `select n, 'John', 42 from generate_series(1,3) n`, nil, pgx.RowToAddrOfStructByPos[Person])
+		require.NoError(t, err)
+		require.Len(t, people, 3)
+		require.EqualValues(t, 1, people[0].ID)
+		require.Equal(t, "John", people[0].Name)
+		require.EqualValues(t, 42, people[0].Age)
+		require.EqualValues(t, 2, people[1].ID)
+		require.Equal(t, "John", people[1].Name)
+		require.EqualValues(t, 42, people[1].Age)
+		require.EqualValues(t, 3, people[2].ID)
+		require.Equal(t, "John", people[2].Name)
+		require.EqualValues(t, 42, people[2].Age)
+	})
+}
+
+func TestSelectNoRows(t *testing.T) {
+	defaultConnTestRunner.RunTest(context.Background(), t, func(ctx context.Context, t testing.TB, conn *pgx.Conn) {
+		type Person struct {
+			ID   int32
+			Name string
+			Age  int32
+		}
+
+		people, err := pgxrecord.Select(ctx, conn, `select 1, 'John', 42 where false`, nil, pgx.RowToAddrOfStructByPos[Person])
+		require.NoError(t, err)
+		require.Len(t, people, 0)
+	})
+}
+
 func TestSelectRow(t *testing.T) {
 	defaultConnTestRunner.RunTest(context.Background(), t, func(ctx context.Context, t testing.TB, conn *pgx.Conn) {
 		type Person struct {
