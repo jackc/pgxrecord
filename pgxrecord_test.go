@@ -238,3 +238,33 @@ func TestRecordSaveUpdate(t *testing.T) {
 		require.Equal(t, map[string]any{"id": int32(1), "name": "Bill", "age": int32(42)}, record.Attributes())
 	})
 }
+
+func TestSelectRow(t *testing.T) {
+	defaultConnTestRunner.RunTest(context.Background(), t, func(ctx context.Context, t testing.TB, conn *pgx.Conn) {
+		type Person struct {
+			ID   int32
+			Name string
+			Age  int32
+		}
+
+		person, err := pgxrecord.SelectRow(ctx, conn, `select 1, 'John', 42`, nil, pgx.RowToAddrOfStructByPos[Person])
+		require.NoError(t, err)
+		require.EqualValues(t, 1, person.ID)
+		require.Equal(t, "John", person.Name)
+		require.EqualValues(t, 42, person.Age)
+	})
+}
+
+func TestSelectRowNoRows(t *testing.T) {
+	defaultConnTestRunner.RunTest(context.Background(), t, func(ctx context.Context, t testing.TB, conn *pgx.Conn) {
+		type Person struct {
+			ID   int32
+			Name string
+			Age  int32
+		}
+
+		person, err := pgxrecord.SelectRow(ctx, conn, `select 1, 'John', 42 where false`, nil, pgx.RowToAddrOfStructByPos[Person])
+		require.ErrorIs(t, err, pgx.ErrNoRows)
+		require.Nil(t, person)
+	})
+}

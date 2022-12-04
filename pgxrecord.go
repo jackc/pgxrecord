@@ -434,3 +434,16 @@ func (r *Record) update(ctx context.Context, db DB) (string, []any) {
 
 	return b.String(), args
 }
+
+// SelectRow executes sql with args on db and returns the value returns the T produced by scanFn. The query should
+// return one row. If no rows are found returns an error where errors.Is(pgx.ErrNoRows) is true.
+func SelectRow[T any](ctx context.Context, db DB, sql string, args []any, scanFn pgx.RowToFunc[T]) (T, error) {
+	rows, _ := db.Query(ctx, sql, args...)
+	pr, err := pgx.CollectOneRow(rows, scanFn)
+	if err != nil {
+		var zero T
+		return zero, err
+	}
+
+	return pr, nil
+}
