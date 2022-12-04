@@ -4,6 +4,7 @@ package pgxrecord
 import (
 	"context"
 	"fmt"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -446,8 +447,8 @@ func Select[T any](ctx context.Context, db DB, sql string, args []any, scanFn pg
 	return collectedRows, nil
 }
 
-// SelectRow executes sql with args on db and returns the value returns the T produced by scanFn. The query should
-// return one row. If no rows are found returns an error where errors.Is(pgx.ErrNoRows) is true.
+// SelectRow executes sql with args on db and returns the T produced by scanFn. The query should return one row. If no
+// rows are found returns an error where errors.Is(pgx.ErrNoRows) is true.
 func SelectRow[T any](ctx context.Context, db DB, sql string, args []any, scanFn pgx.RowToFunc[T]) (T, error) {
 	rows, _ := db.Query(ctx, sql, args...)
 	collectedRow, err := pgx.CollectOneRow(rows, scanFn)
@@ -457,4 +458,66 @@ func SelectRow[T any](ctx context.Context, db DB, sql string, args []any, scanFn
 	}
 
 	return collectedRow, nil
+}
+
+// // InsertRow inserts values into tableName with returningClause and returns the T produced by scanFn.
+func InsertRow[T any](ctx context.Context, db DB, tableName pgx.Identifier, values map[string]any, returningClause string, scanFn pgx.RowToFunc[T]) (T, error) {
+	sql, args := insertRowSQL(tableName, values, returningClause)
+	return SelectRow(ctx, db, sql, args, scanFn)
+}
+
+func sanitizeIdentifier(s string) string {
+	for _, r := range s {
+		if !((r >= '0' && r <= '9') || (r >= 'a' && r <= 'z') || r == '_') {
+			return pgx.Identifier{s}.Sanitize()
+		}
+	}
+
+	return s
+}
+
+func insertRowSQL(tableName pgx.Identifier, values map[string]any, returningClause string) (sql string, args []any) {
+	b := &strings.Builder{}
+	b.WriteString("insert into ")
+	if len(tableName) == 1 {
+		b.WriteString(sanitizeIdentifier(tableName[0]))
+	} else {
+		b.WriteString(tableName.Sanitize())
+	}
+	b.WriteString(" (")
+
+	// Go maps are iterated in random order. The generated SQL should be stable so sort the keys.
+	keys := make([]string, 0, len(values))
+	for k := range values {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+
+	for i, k := range keys {
+		if i > 0 {
+			b.WriteString(", ")
+		}
+		sanitizedKey := sanitizeIdentifier(k)
+		b.WriteString(sanitizedKey)
+	}
+
+	b.WriteString(") values (")
+	args = make([]any, len(keys))
+	for i, k := range keys {
+		if i > 0 {
+			b.WriteString(", ")
+		}
+		args[i] = values[k]
+		b.WriteByte('$')
+		b.WriteString(strconv.FormatInt(int64(i+1), 10))
+	}
+
+	b.WriteString(")")
+
+	if returningClause != "" {
+		b.WriteString(" returning ")
+		b.WriteString(returningClause)
+	}
+
+	return b.String(), args
 }
