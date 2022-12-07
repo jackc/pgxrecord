@@ -460,7 +460,7 @@ func SelectRow[T any](ctx context.Context, db DB, sql string, args []any, scanFn
 	return collectedRow, nil
 }
 
-// // InsertRow inserts values into tableName with returningClause and returns the T produced by scanFn.
+// InsertRow inserts values into tableName with returningClause and returns the T produced by scanFn.
 func InsertRow[T any](ctx context.Context, db DB, tableName pgx.Identifier, values map[string]any, returningClause string, scanFn pgx.RowToFunc[T]) (T, error) {
 	sql, args := insertRowSQL(tableName, values, returningClause)
 	return SelectRow(ctx, db, sql, args, scanFn)
