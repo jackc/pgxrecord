@@ -460,6 +460,72 @@ func SelectRow[T any](ctx context.Context, db DB, sql string, args []any, scanFn
 	return collectedRow, nil
 }
 
+// Insert inserts rows into tableName with returningClause and returns the []T produced by scanFn.
+func Insert[T any](ctx context.Context, db DB, tableName pgx.Identifier, rows []map[string]any, returningClause string, scanFn pgx.RowToFunc[T]) ([]T, error) {
+	if len(rows) == 0 {
+		return nil, nil
+	}
+
+	sql, args := insertSQL(tableName, rows, returningClause)
+	return Select(ctx, db, sql, args, scanFn)
+}
+
+// insertSQL builds an insert statement that inserts rows into tableName with returningClause. len(rows) must be > 0.
+func insertSQL(tableName pgx.Identifier, rows []map[string]any, returningClause string) (sql string, args []any) {
+	b := &strings.Builder{}
+	b.WriteString("insert into ")
+	if len(tableName) == 1 {
+		b.WriteString(sanitizeIdentifier(tableName[0]))
+	} else {
+		b.WriteString(tableName.Sanitize())
+	}
+	b.WriteString(" (")
+
+	// Go maps are iterated in random order. The generated SQL should be stable so sort the keys.
+	keys := make([]string, 0, len(rows[0]))
+	for k := range rows[0] {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+
+	for i, k := range keys {
+		if i > 0 {
+			b.WriteString(", ")
+		}
+		sanitizedKey := sanitizeIdentifier(k)
+		b.WriteString(sanitizedKey)
+	}
+
+	args = make([]any, 0, len(keys))
+	placeholder := int64(1)
+	for i, values := range rows {
+		if i == 0 {
+			b.WriteString(") values (")
+		} else {
+			b.WriteString("), (")
+		}
+
+		for j, key := range keys {
+			if j > 0 {
+				b.WriteString(", ")
+			}
+			args = append(args, values[key])
+			b.WriteByte('$')
+			b.WriteString(strconv.FormatInt(placeholder, 10))
+			placeholder++
+		}
+	}
+
+	b.WriteString(")")
+
+	if returningClause != "" {
+		b.WriteString(" returning ")
+		b.WriteString(returningClause)
+	}
+
+	return b.String(), args
+}
+
 // InsertRow inserts values into tableName with returningClause and returns the T produced by scanFn.
 func InsertRow[T any](ctx context.Context, db DB, tableName pgx.Identifier, values map[string]any, returningClause string, scanFn pgx.RowToFunc[T]) (T, error) {
 	sql, args := insertRowSQL(tableName, values, returningClause)

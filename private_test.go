@@ -11,3 +11,7 @@ func Private_sanitizeIdentifier(s string) string {
 func Private_insertRowSQL(tableName pgx.Identifier, values map[string]any, returningClause string) (sql string, args []any) {
 	return insertRowSQL(tableName, values, returningClause)
 }
+
+func Private_insertSQL(tableName pgx.Identifier, rows []map[string]any, returningClause string) (sql string, args []any) {
+	return insertSQL(tableName, rows, returningClause)
+}
