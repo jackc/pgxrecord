@@ -9,12 +9,14 @@ import (
 	"strings"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 )
 
 // DB is the interface pgxrecord uses to access the database. It is satisfied by *pgx.Conn, pgx.Tx, *pgxpool.Pool, etc.
 type DB interface {
 	Query(ctx context.Context, sql string, optionsAndArgs ...interface{}) (pgx.Rows, error)
 	QueryRow(ctx context.Context, sql string, optionsAndArgs ...interface{}) pgx.Row
+	Exec(ctx context.Context, sql string, arguments ...any) (pgconn.CommandTag, error)
 }
 
 // Column represents a column in a table.
@@ -586,4 +588,20 @@ func insertRowSQL(tableName pgx.Identifier, values map[string]any, returningClau
 	}
 
 	return b.String(), args
+}
+
+// ExecRow executes SQL with args on db. It returns an error unless exactly one row is affected.
+func ExecRow(ctx context.Context, db DB, sql string, args ...any) (pgconn.CommandTag, error) {
+	ct, err := db.Exec(ctx, sql, args...)
+	if err != nil {
+		return ct, err
+	}
+	rowsAffected := ct.RowsAffected()
+	if rowsAffected == 0 {
+		return ct, pgx.ErrNoRows
+	} else if rowsAffected > 1 {
+		return ct, fmt.Errorf("too many rows")
+	}
+
+	return ct, nil
 }
