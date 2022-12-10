@@ -631,6 +631,13 @@ func ExecRow(ctx context.Context, db DB, sql string, args ...any) (pgconn.Comman
 	return ct, nil
 }
 
+// Update updates rows matching whereValues in tableName with setValues. It includes returningClause and returns the []T
+// produced by scanFn.
+func Update(ctx context.Context, db DB, tableName pgx.Identifier, setValues, whereValues map[string]any) (pgconn.CommandTag, error) {
+	sql, args := updateSQL(tableName, setValues, whereValues, "")
+	return db.Exec(ctx, sql, args...)
+}
+
 // UpdateReturning updates rows matching whereValues in tableName with setValues. It includes returningClause and returns the []T
 // produced by scanFn.
 func UpdateReturning[T any](ctx context.Context, db DB, tableName pgx.Identifier, setValues, whereValues map[string]any, returningClause string, scanFn pgx.RowToFunc[T]) ([]T, error) {
