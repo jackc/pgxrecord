@@ -469,8 +469,8 @@ func SelectRow[T any](ctx context.Context, db DB, sql string, args []any, scanFn
 	return collectedRow, nil
 }
 
-// Insert inserts rows into tableName with returningClause and returns the []T produced by scanFn.
-func Insert[T any](ctx context.Context, db DB, tableName pgx.Identifier, rows []map[string]any, returningClause string, scanFn pgx.RowToFunc[T]) ([]T, error) {
+// InsertReturning inserts rows into tableName with returningClause and returns the []T produced by scanFn.
+func InsertReturning[T any](ctx context.Context, db DB, tableName pgx.Identifier, rows []map[string]any, returningClause string, scanFn pgx.RowToFunc[T]) ([]T, error) {
 	if len(rows) == 0 {
 		return nil, nil
 	}
@@ -535,8 +535,8 @@ func insertSQL(tableName pgx.Identifier, rows []map[string]any, returningClause 
 	return b.String(), args
 }
 
-// InsertRow inserts values into tableName with returningClause and returns the T produced by scanFn.
-func InsertRow[T any](ctx context.Context, db DB, tableName pgx.Identifier, values map[string]any, returningClause string, scanFn pgx.RowToFunc[T]) (T, error) {
+// InsertRowReturning inserts values into tableName with returningClause and returns the T produced by scanFn.
+func InsertRowReturning[T any](ctx context.Context, db DB, tableName pgx.Identifier, values map[string]any, returningClause string, scanFn pgx.RowToFunc[T]) (T, error) {
 	sql, args := insertRowSQL(tableName, values, returningClause)
 	return SelectRow(ctx, db, sql, args, scanFn)
 }
@@ -613,16 +613,16 @@ func ExecRow(ctx context.Context, db DB, sql string, args ...any) (pgconn.Comman
 	return ct, nil
 }
 
-// Update updates rows matching whereValues in tableName with setValues. It includes returningClause and returns the []T
+// UpdateReturning updates rows matching whereValues in tableName with setValues. It includes returningClause and returns the []T
 // produced by scanFn.
-func Update[T any](ctx context.Context, db DB, tableName pgx.Identifier, setValues, whereValues map[string]any, returningClause string, scanFn pgx.RowToFunc[T]) ([]T, error) {
+func UpdateReturning[T any](ctx context.Context, db DB, tableName pgx.Identifier, setValues, whereValues map[string]any, returningClause string, scanFn pgx.RowToFunc[T]) ([]T, error) {
 	sql, args := updateSQL(tableName, setValues, whereValues, returningClause)
 	return Select(ctx, db, sql, args, scanFn)
 }
 
-// UpdateRow updates a row matching whereValues in tableName with setValues. It includes returningClause and returns the
+// UpdateRowReturning updates a row matching whereValues in tableName with setValues. It includes returningClause and returns the
 // T produced by scanFn. Returns an error unless exactly one row is updated.
-func UpdateRow[T any](ctx context.Context, db DB, tableName pgx.Identifier, setValues, whereValues map[string]any, returningClause string, scanFn pgx.RowToFunc[T]) (T, error) {
+func UpdateRowReturning[T any](ctx context.Context, db DB, tableName pgx.Identifier, setValues, whereValues map[string]any, returningClause string, scanFn pgx.RowToFunc[T]) (T, error) {
 	sql, args := updateSQL(tableName, setValues, whereValues, returningClause)
 	return SelectRow(ctx, db, sql, args, scanFn)
 }

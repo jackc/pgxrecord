@@ -300,7 +300,7 @@ func TestSelectRowNoRows(t *testing.T) {
 	})
 }
 
-func TestInsert(t *testing.T) {
+func TestInsertReturning(t *testing.T) {
 	t.Parallel()
 
 	defaultConnTestRunner.RunTest(context.Background(), t, func(ctx context.Context, t testing.TB, conn *pgx.Conn) {
@@ -317,7 +317,7 @@ func TestInsert(t *testing.T) {
 			Age  int32
 		}
 
-		people, err := pgxrecord.Insert(ctx, conn, pgx.Identifier{"t"}, []map[string]any{{"name": "John", "age": 42}, {"name": "Jane", "age": 40}}, "*", pgx.RowToAddrOfStructByPos[Person])
+		people, err := pgxrecord.InsertReturning(ctx, conn, pgx.Identifier{"t"}, []map[string]any{{"name": "John", "age": 42}, {"name": "Jane", "age": 40}}, "*", pgx.RowToAddrOfStructByPos[Person])
 		require.NoError(t, err)
 		require.Len(t, people, 2)
 		require.EqualValues(t, 1, people[0].ID)
@@ -394,7 +394,7 @@ func TestInsertSQL(t *testing.T) {
 	}
 }
 
-func TestInsertRow(t *testing.T) {
+func TestInsertRowReturning(t *testing.T) {
 	t.Parallel()
 
 	defaultConnTestRunner.RunTest(context.Background(), t, func(ctx context.Context, t testing.TB, conn *pgx.Conn) {
@@ -411,7 +411,7 @@ func TestInsertRow(t *testing.T) {
 			Age  int32
 		}
 
-		person, err := pgxrecord.InsertRow(ctx, conn, pgx.Identifier{"t"}, map[string]any{"name": "John", "age": 42}, "*", pgx.RowToAddrOfStructByPos[Person])
+		person, err := pgxrecord.InsertRowReturning(ctx, conn, pgx.Identifier{"t"}, map[string]any{"name": "John", "age": 42}, "*", pgx.RowToAddrOfStructByPos[Person])
 		require.NoError(t, err)
 		require.EqualValues(t, 1, person.ID)
 		require.Equal(t, "John", person.Name)
@@ -529,7 +529,7 @@ func TestExecRow(t *testing.T) {
 			Age  int32
 		}
 
-		people, err := pgxrecord.Insert(ctx, conn, pgx.Identifier{"t"}, []map[string]any{{"name": "John", "age": 42}, {"name": "Jane", "age": 40}}, "*", pgx.RowToAddrOfStructByPos[Person])
+		people, err := pgxrecord.InsertReturning(ctx, conn, pgx.Identifier{"t"}, []map[string]any{{"name": "John", "age": 42}, {"name": "Jane", "age": 40}}, "*", pgx.RowToAddrOfStructByPos[Person])
 		require.NoError(t, err)
 		require.Len(t, people, 2)
 		require.EqualValues(t, 1, people[0].ID)
@@ -610,7 +610,7 @@ func TestUpdateSQL(t *testing.T) {
 	}
 }
 
-func TestUpdate(t *testing.T) {
+func TestUpdateReturning(t *testing.T) {
 	t.Parallel()
 
 	defaultConnTestRunner.RunTest(context.Background(), t, func(ctx context.Context, t testing.TB, conn *pgx.Conn) {
@@ -627,15 +627,15 @@ func TestUpdate(t *testing.T) {
 			Age  int32
 		}
 
-		people, err := pgxrecord.Update(ctx, conn, pgx.Identifier{"t"}, map[string]any{"age": 42}, nil, "*", pgx.RowToAddrOfStructByPos[Person])
+		people, err := pgxrecord.UpdateReturning(ctx, conn, pgx.Identifier{"t"}, map[string]any{"age": 42}, nil, "*", pgx.RowToAddrOfStructByPos[Person])
 		require.NoError(t, err)
 		require.Len(t, people, 0)
 
-		people, err = pgxrecord.Insert(ctx, conn, pgx.Identifier{"t"}, []map[string]any{{"name": "John", "age": 42}, {"name": "Jane", "age": 40}}, "*", pgx.RowToAddrOfStructByPos[Person])
+		people, err = pgxrecord.InsertReturning(ctx, conn, pgx.Identifier{"t"}, []map[string]any{{"name": "John", "age": 42}, {"name": "Jane", "age": 40}}, "*", pgx.RowToAddrOfStructByPos[Person])
 		require.NoError(t, err)
 		require.Len(t, people, 2)
 
-		people, err = pgxrecord.Update(ctx, conn, pgx.Identifier{"t"}, map[string]any{"age": 70}, map[string]any{"name": "John"}, "*", pgx.RowToAddrOfStructByPos[Person])
+		people, err = pgxrecord.UpdateReturning(ctx, conn, pgx.Identifier{"t"}, map[string]any{"age": 70}, map[string]any{"name": "John"}, "*", pgx.RowToAddrOfStructByPos[Person])
 		require.NoError(t, err)
 		require.Len(t, people, 1)
 		require.EqualValues(t, 1, people[0].ID)
@@ -644,7 +644,7 @@ func TestUpdate(t *testing.T) {
 	})
 }
 
-func TestUpdateRow(t *testing.T) {
+func TestUpdateRowReturning(t *testing.T) {
 	t.Parallel()
 
 	defaultConnTestRunner.RunTest(context.Background(), t, func(ctx context.Context, t testing.TB, conn *pgx.Conn) {
@@ -661,22 +661,22 @@ func TestUpdateRow(t *testing.T) {
 			Age  int32
 		}
 
-		person, err := pgxrecord.UpdateRow(ctx, conn, pgx.Identifier{"t"}, map[string]any{"age": 42}, nil, "*", pgx.RowToAddrOfStructByPos[Person])
+		person, err := pgxrecord.UpdateRowReturning(ctx, conn, pgx.Identifier{"t"}, map[string]any{"age": 42}, nil, "*", pgx.RowToAddrOfStructByPos[Person])
 		require.ErrorIs(t, err, pgx.ErrNoRows)
 		require.Nil(t, person)
 
-		people, err := pgxrecord.Insert(ctx, conn, pgx.Identifier{"t"}, []map[string]any{{"name": "John", "age": 42}, {"name": "Jane", "age": 40}}, "*", pgx.RowToAddrOfStructByPos[Person])
+		people, err := pgxrecord.InsertReturning(ctx, conn, pgx.Identifier{"t"}, []map[string]any{{"name": "John", "age": 42}, {"name": "Jane", "age": 40}}, "*", pgx.RowToAddrOfStructByPos[Person])
 		require.NoError(t, err)
 		require.Len(t, people, 2)
 
-		person, err = pgxrecord.UpdateRow(ctx, conn, pgx.Identifier{"t"}, map[string]any{"age": 70}, map[string]any{"name": "John"}, "*", pgx.RowToAddrOfStructByPos[Person])
+		person, err = pgxrecord.UpdateRowReturning(ctx, conn, pgx.Identifier{"t"}, map[string]any{"age": 70}, map[string]any{"name": "John"}, "*", pgx.RowToAddrOfStructByPos[Person])
 		require.NoError(t, err)
 		require.NotNil(t, person)
 		require.EqualValues(t, 1, person.ID)
 		require.Equal(t, "John", person.Name)
 		require.EqualValues(t, 70, person.Age)
 
-		person, err = pgxrecord.UpdateRow(ctx, conn, pgx.Identifier{"t"}, map[string]any{"age": 70}, nil, "*", pgx.RowToAddrOfStructByPos[Person])
+		person, err = pgxrecord.UpdateRowReturning(ctx, conn, pgx.Identifier{"t"}, map[string]any{"age": 70}, nil, "*", pgx.RowToAddrOfStructByPos[Person])
 		require.ErrorContains(t, err, "too many rows")
 	})
 }
