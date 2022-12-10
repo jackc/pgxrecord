@@ -12,6 +12,8 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 )
 
+var errTooManyRows = fmt.Errorf("too many rows")
+
 // DB is the interface pgxrecord uses to access the database. It is satisfied by *pgx.Conn, pgx.Tx, *pgxpool.Pool, etc.
 type DB interface {
 	Query(ctx context.Context, sql string, optionsAndArgs ...interface{}) (pgx.Rows, error)
@@ -450,13 +452,18 @@ func Select[T any](ctx context.Context, db DB, sql string, args []any, scanFn pg
 }
 
 // SelectRow executes sql with args on db and returns the T produced by scanFn. The query should return one row. If no
-// rows are found returns an error where errors.Is(pgx.ErrNoRows) is true.
+// rows are found returns an error where errors.Is(pgx.ErrNoRows) is true. Returns an error if more than one row is
+// returned.
 func SelectRow[T any](ctx context.Context, db DB, sql string, args []any, scanFn pgx.RowToFunc[T]) (T, error) {
 	rows, _ := db.Query(ctx, sql, args...)
 	collectedRow, err := pgx.CollectOneRow(rows, scanFn)
 	if err != nil {
 		var zero T
 		return zero, err
+	}
+
+	if rows.CommandTag().RowsAffected() > 1 {
+		return collectedRow, errTooManyRows
 	}
 
 	return collectedRow, nil
@@ -600,8 +607,81 @@ func ExecRow(ctx context.Context, db DB, sql string, args ...any) (pgconn.Comman
 	if rowsAffected == 0 {
 		return ct, pgx.ErrNoRows
 	} else if rowsAffected > 1 {
-		return ct, fmt.Errorf("too many rows")
+		return ct, errTooManyRows
 	}
 
 	return ct, nil
+}
+
+// Update updates rows matching whereValues in tableName with setValues. It includes returningClause and returns the []T
+// produced by scanFn.
+func Update[T any](ctx context.Context, db DB, tableName pgx.Identifier, setValues, whereValues map[string]any, returningClause string, scanFn pgx.RowToFunc[T]) ([]T, error) {
+	sql, args := updateSQL(tableName, setValues, whereValues, returningClause)
+	return Select(ctx, db, sql, args, scanFn)
+}
+
+// UpdateRow updates a row matching whereValues in tableName with setValues. It includes returningClause and returns the
+// T produced by scanFn. Returns an error unless exactly one row is updated.
+func UpdateRow[T any](ctx context.Context, db DB, tableName pgx.Identifier, setValues, whereValues map[string]any, returningClause string, scanFn pgx.RowToFunc[T]) (T, error) {
+	sql, args := updateSQL(tableName, setValues, whereValues, returningClause)
+	return SelectRow(ctx, db, sql, args, scanFn)
+}
+
+func updateSQL(tableName pgx.Identifier, setValues, whereValues map[string]any, returningClause string) (sql string, args []any) {
+	b := &strings.Builder{}
+	b.WriteString("update ")
+	if len(tableName) == 1 {
+		b.WriteString(sanitizeIdentifier(tableName[0]))
+	} else {
+		b.WriteString(tableName.Sanitize())
+	}
+	b.WriteString(" set ")
+
+	args = make([]any, 0, len(setValues)+len(whereValues))
+
+	// Go maps are iterated in random order. The generated SQL should be stable so sort the setValueKeys.
+	setValueKeys := make([]string, 0, len(setValues))
+	for k := range setValues {
+		setValueKeys = append(setValueKeys, k)
+	}
+	sort.Strings(setValueKeys)
+
+	for i, k := range setValueKeys {
+		if i > 0 {
+			b.WriteString(", ")
+		}
+		sanitizedKey := sanitizeIdentifier(k)
+		b.WriteString(sanitizedKey)
+		b.WriteString(" = $")
+		args = append(args, setValues[k])
+		b.WriteString(strconv.FormatInt(int64(len(args)), 10))
+	}
+
+	if len(whereValues) > 0 {
+		b.WriteString(" where ")
+
+		whereValueKeys := make([]string, 0, len(whereValues))
+		for k := range whereValues {
+			whereValueKeys = append(whereValueKeys, k)
+		}
+		sort.Strings(whereValueKeys)
+
+		for i, k := range whereValueKeys {
+			if i > 0 {
+				b.WriteString(" and ")
+			}
+			sanitizedKey := sanitizeIdentifier(k)
+			b.WriteString(sanitizedKey)
+			b.WriteString(" = $")
+			args = append(args, whereValues[k])
+			b.WriteString(strconv.FormatInt(int64(len(args)), 10))
+		}
+	}
+
+	if returningClause != "" {
+		b.WriteString(" returning ")
+		b.WriteString(returningClause)
+	}
+
+	return b.String(), args
 }
