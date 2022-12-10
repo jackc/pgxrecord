@@ -546,6 +546,13 @@ func insertSQL(tableName pgx.Identifier, rows []map[string]any, returningClause 
 	return b.String(), args
 }
 
+// InsertRow inserts values into tableName.
+func InsertRow(ctx context.Context, db DB, tableName pgx.Identifier, values map[string]any) error {
+	sql, args := insertRowSQL(tableName, values, "")
+	_, err := db.Exec(ctx, sql, args...)
+	return err
+}
+
 // InsertRowReturning inserts values into tableName with returningClause and returns the T produced by scanFn.
 func InsertRowReturning[T any](ctx context.Context, db DB, tableName pgx.Identifier, values map[string]any, returningClause string, scanFn pgx.RowToFunc[T]) (T, error) {
 	sql, args := insertRowSQL(tableName, values, returningClause)
