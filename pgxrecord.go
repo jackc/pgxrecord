@@ -645,6 +645,14 @@ func UpdateReturning[T any](ctx context.Context, db DB, tableName pgx.Identifier
 	return Select(ctx, db, sql, args, scanFn)
 }
 
+// UpdateRow updates a row matching whereValues in tableName with setValues. Returns an error unless exactly one row is
+// updated.
+func UpdateRow(ctx context.Context, db DB, tableName pgx.Identifier, setValues, whereValues map[string]any) error {
+	sql, args := updateSQL(tableName, setValues, whereValues, "")
+	_, err := ExecRow(ctx, db, sql, args...)
+	return err
+}
+
 // UpdateRowReturning updates a row matching whereValues in tableName with setValues. It includes returningClause and returns the
 // T produced by scanFn. Returns an error unless exactly one row is updated.
 func UpdateRowReturning[T any](ctx context.Context, db DB, tableName pgx.Identifier, setValues, whereValues map[string]any, returningClause string, scanFn pgx.RowToFunc[T]) (T, error) {
