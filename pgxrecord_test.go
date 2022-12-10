@@ -317,7 +317,7 @@ func TestInsert(t *testing.T) {
 			Age  int32
 		}
 
-		err = pgxrecord.Insert(ctx, conn, pgx.Identifier{"t"}, []map[string]any{{"name": "John", "age": 42}, {"name": "Jane", "age": 40}})
+		_, err = pgxrecord.Insert(ctx, conn, pgx.Identifier{"t"}, []map[string]any{{"name": "John", "age": 42}, {"name": "Jane", "age": 40}})
 		require.NoError(t, err)
 
 		people, err := pgxrecord.Select(ctx, conn, `select * from t order by id`, nil, pgx.RowToAddrOfStructByPos[Person])
@@ -690,7 +690,7 @@ func TestUpdate(t *testing.T) {
 		require.NoError(t, err)
 		require.EqualValues(t, 0, ct.RowsAffected())
 
-		err = pgxrecord.Insert(ctx, conn, pgx.Identifier{"t"}, []map[string]any{{"name": "John", "age": 42}, {"name": "Jane", "age": 40}})
+		_, err = pgxrecord.Insert(ctx, conn, pgx.Identifier{"t"}, []map[string]any{{"name": "John", "age": 42}, {"name": "Jane", "age": 40}})
 		require.NoError(t, err)
 
 		ct, err = pgxrecord.Update(ctx, conn, pgx.Identifier{"t"}, map[string]any{"age": 70}, map[string]any{"name": "John"})

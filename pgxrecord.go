@@ -470,14 +470,13 @@ func SelectRow[T any](ctx context.Context, db DB, sql string, args []any, scanFn
 }
 
 // Insert inserts rows into tableName.
-func Insert(ctx context.Context, db DB, tableName pgx.Identifier, rows []map[string]any) error {
+func Insert(ctx context.Context, db DB, tableName pgx.Identifier, rows []map[string]any) (pgconn.CommandTag, error) {
 	if len(rows) == 0 {
-		return nil
+		return pgconn.CommandTag{}, nil
 	}
 
 	sql, args := insertSQL(tableName, rows, "")
-	_, err := db.Exec(ctx, sql, args...)
-	return err
+	return db.Exec(ctx, sql, args...)
 }
 
 // InsertReturning inserts rows into tableName with returningClause and returns the []T produced by scanFn.
