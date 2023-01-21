@@ -17,7 +17,6 @@ var errTooManyRows = fmt.Errorf("too many rows")
 // DB is the interface pgxrecord uses to access the database. It is satisfied by *pgx.Conn, pgx.Tx, *pgxpool.Pool, etc.
 type DB interface {
 	Query(ctx context.Context, sql string, optionsAndArgs ...interface{}) (pgx.Rows, error)
-	QueryRow(ctx context.Context, sql string, optionsAndArgs ...interface{}) pgx.Row
 	Exec(ctx context.Context, sql string, arguments ...any) (pgconn.CommandTag, error)
 }
 
@@ -354,7 +353,23 @@ func (r *Record) Save(ctx context.Context, db DB) error {
 		ptrsToAttributes[i] = &r.attributes[i]
 	}
 
-	err := db.QueryRow(ctx, sql, args...).Scan(ptrsToAttributes...)
+	rows, err := db.Query(ctx, sql, args...)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+
+	if rows.Next() {
+		rows.Scan(ptrsToAttributes...)
+	} else {
+		return pgx.ErrNoRows
+	}
+
+	if rows.Next() {
+		return errTooManyRows
+	}
+
+	err = rows.Err()
 	if err != nil {
 		return err
 	}
