@@ -86,7 +86,7 @@ func (t *Table) LoadAllColumns(ctx context.Context, db DB) error {
 		var err error
 		tableOID, err = pgx.CollectOneRow(rows, pgx.RowTo[uint32])
 		if err != nil {
-			return fmt.Errorf("failed to find table OID for %v: %v", t.Name, err)
+			return fmt.Errorf("pgxrecord.Table (%s): LoadAllColumns: failed to find table OID: %v", t.Name.Sanitize(), err)
 		}
 	}
 
@@ -106,7 +106,7 @@ func (t *Table) LoadAllColumns(ctx context.Context, db DB) error {
 	var err error
 	t.Columns, err = pgx.CollectRows(rows, pgx.RowToAddrOfStructByPos[Column])
 	if err != nil {
-		return fmt.Errorf("failed to find columns: %v", err)
+		return fmt.Errorf("pgxrecord.Table (%s): LoadAllColumns: failed to find columns: %v", t.Name.Sanitize(), err)
 	}
 
 	return nil
@@ -241,7 +241,7 @@ func (t *Table) FindByPK(ctx context.Context, db DB, pk ...any) (*Record, error)
 	rows, _ := db.Query(ctx, t.selectByPKQuery, pk...)
 	record, err := pgx.CollectOneRow(rows, t.RowToRecord)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("pgxrecord.Table (%s): FindByPK (%v): %w", t.quotedQualifiedName, pk, err)
 	}
 
 	return record, nil
@@ -262,7 +262,7 @@ func (t *Table) RowToRecord(row pgx.CollectableRow) (*Record, error) {
 
 	err := row.Scan(ptrsToAttributes...)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("pgxrecord.Table (%s): RowToRecord: %w", t.quotedQualifiedName, err)
 	}
 
 	record.originalAttributes = make([]any, len(record.attributes))
@@ -275,7 +275,7 @@ func (t *Table) RowToRecord(row pgx.CollectableRow) (*Record, error) {
 func (r *Record) Set(attribute string, value any) error {
 	idx, ok := r.table.nameToColumnIndex[attribute]
 	if !ok {
-		return fmt.Errorf("attribute %q is not found", attribute)
+		return fmt.Errorf("pgxrecord.Record (%s): Set: attribute %q is not found", r.table.quotedQualifiedName, attribute)
 	}
 
 	r.attributes[idx] = value
@@ -296,7 +296,7 @@ func (r *Record) MustSet(attribute string, value any) {
 func (r *Record) Get(attribute string) (any, error) {
 	idx, ok := r.table.nameToColumnIndex[attribute]
 	if !ok {
-		return nil, fmt.Errorf("attribute %q is not found", attribute)
+		return nil, fmt.Errorf("pgxrecord.Record (%s): Get: attribute %q is not found", r.table.quotedQualifiedName, attribute)
 	}
 
 	return r.attributes[idx], nil
@@ -316,7 +316,7 @@ func (r *Record) SetAttributes(attributes map[string]any) error {
 	for k, v := range attributes {
 		idx, ok := r.table.nameToColumnIndex[k]
 		if !ok {
-			return fmt.Errorf("attribute %q is not found", k)
+			return fmt.Errorf("pgxrecord.Record (%s): Set: attribute %q is not found", r.table.quotedQualifiedName, k)
 		}
 
 		r.attributes[idx] = v
@@ -354,7 +354,7 @@ func (r *Record) Save(ctx context.Context, db DB) error {
 
 	err := queryRow(ctx, db, sql, args, ptrsToAttributes)
 	if err != nil {
-		return err
+		return fmt.Errorf("pgxrecord.Record (%s): Save: %w", r.table.quotedQualifiedName, err)
 	}
 
 	r.originalAttributes = make([]any, len(r.attributes))
