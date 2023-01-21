@@ -17,7 +17,6 @@ var errTooManyRows = fmt.Errorf("too many rows")
 // DB is the interface pgxrecord uses to access the database. It is satisfied by *pgx.Conn, pgx.Tx, *pgxpool.Pool, etc.
 type DB interface {
 	Query(ctx context.Context, sql string, optionsAndArgs ...interface{}) (pgx.Rows, error)
-	Exec(ctx context.Context, sql string, arguments ...any) (pgconn.CommandTag, error)
 }
 
 // Column represents a column in a table.
@@ -475,7 +474,7 @@ func Insert(ctx context.Context, db DB, tableName pgx.Identifier, rows []map[str
 	}
 
 	sql, args := insertSQL(tableName, rows, "")
-	return db.Exec(ctx, sql, args...)
+	return exec(ctx, db, sql, args)
 }
 
 // InsertReturning inserts rows into tableName with returningClause and returns the []T produced by scanFn.
@@ -547,7 +546,7 @@ func insertSQL(tableName pgx.Identifier, rows []map[string]any, returningClause 
 // InsertRow inserts values into tableName.
 func InsertRow(ctx context.Context, db DB, tableName pgx.Identifier, values map[string]any) error {
 	sql, args := insertRowSQL(tableName, values, "")
-	_, err := db.Exec(ctx, sql, args...)
+	_, err := exec(ctx, db, sql, args)
 	return err
 }
 
@@ -615,7 +614,7 @@ func insertRowSQL(tableName pgx.Identifier, values map[string]any, returningClau
 
 // ExecRow executes SQL with args on db. It returns an error unless exactly one row is affected.
 func ExecRow(ctx context.Context, db DB, sql string, args ...any) (pgconn.CommandTag, error) {
-	ct, err := db.Exec(ctx, sql, args...)
+	ct, err := exec(ctx, db, sql, args)
 	if err != nil {
 		return ct, err
 	}
@@ -633,7 +632,7 @@ func ExecRow(ctx context.Context, db DB, sql string, args ...any) (pgconn.Comman
 // produced by scanFn.
 func Update(ctx context.Context, db DB, tableName pgx.Identifier, setValues, whereValues map[string]any) (pgconn.CommandTag, error) {
 	sql, args := updateSQL(tableName, setValues, whereValues, "")
-	return db.Exec(ctx, sql, args...)
+	return exec(ctx, db, sql, args)
 }
 
 // UpdateReturning updates rows matching whereValues in tableName with setValues. It includes returningClause and returns the []T
@@ -742,4 +741,16 @@ func queryRow(ctx context.Context, db DB, sql string, args []any, scanTargets []
 	}
 
 	return nil
+}
+
+// exec builds Exec-like functionality on top of DB. This allows pgxrecord to have the convenience of Exec with needing
+// it as part of the DB interface.
+func exec(ctx context.Context, db DB, sql string, args []any) (pgconn.CommandTag, error) {
+	rows, err := db.Query(ctx, sql, args...)
+	if err != nil {
+		return pgconn.CommandTag{}, err
+	}
+	rows.Close()
+
+	return rows.CommandTag(), rows.Err()
 }
