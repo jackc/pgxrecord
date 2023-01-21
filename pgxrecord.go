@@ -353,23 +353,7 @@ func (r *Record) Save(ctx context.Context, db DB) error {
 		ptrsToAttributes[i] = &r.attributes[i]
 	}
 
-	rows, err := db.Query(ctx, sql, args...)
-	if err != nil {
-		return err
-	}
-	defer rows.Close()
-
-	if rows.Next() {
-		rows.Scan(ptrsToAttributes...)
-	} else {
-		return pgx.ErrNoRows
-	}
-
-	if rows.Next() {
-		return errTooManyRows
-	}
-
-	err = rows.Err()
+	err := queryRow(ctx, db, sql, args, ptrsToAttributes)
 	if err != nil {
 		return err
 	}
@@ -731,4 +715,31 @@ func updateSQL(tableName pgx.Identifier, setValues, whereValues map[string]any, 
 	}
 
 	return b.String(), args
+}
+
+// queryRow builds QueryRow-like functionality on top of DB. This allows pgxrecord to have the convenience of QueryRow
+// without needing it as part of the DB interface.
+func queryRow(ctx context.Context, db DB, sql string, args []any, scanTargets []any) error {
+	rows, err := db.Query(ctx, sql, args...)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+
+	if rows.Next() {
+		rows.Scan(scanTargets...)
+	} else {
+		return pgx.ErrNoRows
+	}
+
+	if rows.Next() {
+		return errTooManyRows
+	}
+
+	err = rows.Err()
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
