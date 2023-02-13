@@ -383,35 +383,35 @@ func TestInsertSQL(t *testing.T) {
 			testName:  "Single row",
 			tableName: pgx.Identifier{"people"},
 			rows:      []map[string]any{{"name": "Adam", "sex": "male"}},
-			sql:       `insert into people (name, sex) values ($1, $2) returning *`,
+			sql:       `insert into "people" ("name", "sex") values ($1, $2) returning *`,
 			args:      []any{"Adam", "male"},
 		},
 		{
 			testName:  "Multiple rows",
 			tableName: pgx.Identifier{"people"},
 			rows:      []map[string]any{{"name": "Adam", "sex": "male"}, {"name": "Eve", "sex": "female"}, {"name": "Cain", "sex": "male"}, {"name": "Abel", "sex": "male"}},
-			sql:       `insert into people (name, sex) values ($1, $2), ($3, $4), ($5, $6), ($7, $8) returning *`,
+			sql:       `insert into "people" ("name", "sex") values ($1, $2), ($3, $4), ($5, $6), ($7, $8) returning *`,
 			args:      []any{"Adam", "male", "Eve", "female", "Cain", "male", "Abel", "male"},
 		},
 		{
 			testName:  "Schema qualified table",
 			tableName: pgx.Identifier{"public", "people"},
 			rows:      []map[string]any{{"name": "Adam", "sex": "male"}},
-			sql:       `insert into "public"."people" (name, sex) values ($1, $2) returning *`,
+			sql:       `insert into "public"."people" ("name", "sex") values ($1, $2) returning *`,
 			args:      []any{"Adam", "male"},
 		},
 		{
 			testName:  "Table with special characters",
 			tableName: pgx.Identifier{"Bible Characters"},
 			rows:      []map[string]any{{"name": "Adam", "sex": "male"}},
-			sql:       `insert into "Bible Characters" (name, sex) values ($1, $2) returning *`,
+			sql:       `insert into "Bible Characters" ("name", "sex") values ($1, $2) returning *`,
 			args:      []any{"Adam", "male"},
 		},
 		{
 			testName:  "Column with special characters",
 			tableName: pgx.Identifier{"people"},
 			rows:      []map[string]any{{"Complete Name": "Adam", "sex": "male"}},
-			sql:       `insert into people ("Complete Name", sex) values ($1, $2) returning *`,
+			sql:       `insert into "people" ("Complete Name", "sex") values ($1, $2) returning *`,
 			args:      []any{"Adam", "male"},
 		},
 	}
@@ -498,28 +498,28 @@ func TestInsertRowSQL(t *testing.T) {
 			testName:  "Normal",
 			tableName: pgx.Identifier{"people"},
 			values:    map[string]any{"name": "Adam", "sex": "male"},
-			sql:       `insert into people (name, sex) values ($1, $2) returning *`,
+			sql:       `insert into "people" ("name", "sex") values ($1, $2) returning *`,
 			args:      []any{"Adam", "male"},
 		},
 		{
 			testName:  "Schema qualified table",
 			tableName: pgx.Identifier{"public", "people"},
 			values:    map[string]any{"name": "Adam", "sex": "male"},
-			sql:       `insert into "public"."people" (name, sex) values ($1, $2) returning *`,
+			sql:       `insert into "public"."people" ("name", "sex") values ($1, $2) returning *`,
 			args:      []any{"Adam", "male"},
 		},
 		{
 			testName:  "Table with special characters",
 			tableName: pgx.Identifier{"Bible Characters"},
 			values:    map[string]any{"name": "Adam", "sex": "male"},
-			sql:       `insert into "Bible Characters" (name, sex) values ($1, $2) returning *`,
+			sql:       `insert into "Bible Characters" ("name", "sex") values ($1, $2) returning *`,
 			args:      []any{"Adam", "male"},
 		},
 		{
 			testName:  "Column with special characters",
 			tableName: pgx.Identifier{"people"},
 			values:    map[string]any{"Complete Name": "Adam", "sex": "male"},
-			sql:       `insert into people ("Complete Name", sex) values ($1, $2) returning *`,
+			sql:       `insert into "people" ("Complete Name", "sex") values ($1, $2) returning *`,
 			args:      []any{"Adam", "male"},
 		},
 	}
@@ -529,44 +529,6 @@ func TestInsertRowSQL(t *testing.T) {
 			sql, args := pgxrecord.Private_insertRowSQL(tt.tableName, tt.values, "*")
 			assert.Equal(t, tt.sql, sql)
 			assert.Equal(t, tt.args, args)
-		})
-	}
-}
-
-func TestSanitizeIdentifier(t *testing.T) {
-	t.Parallel()
-
-	tests := []struct {
-		testName string
-		arg      string
-		result   string
-	}{
-		{
-			testName: "No quoting needed",
-			arg:      `foo_bar_123`,
-			result:   `foo_bar_123`,
-		},
-		{
-			testName: "Capital letter is quoted",
-			arg:      `Foo`,
-			result:   `"Foo"`,
-		},
-		{
-			testName: "Space is quoted",
-			arg:      `foo bar`,
-			result:   `"foo bar"`,
-		},
-		{
-			testName: "Special character is quoted",
-			arg:      `foo*`,
-			result:   `"foo*"`,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.testName, func(t *testing.T) {
-			result := pgxrecord.Private_sanitizeIdentifier(tt.arg)
-			assert.Equal(t, tt.result, result)
 		})
 	}
 }
@@ -619,35 +581,35 @@ func TestUpdateSQL(t *testing.T) {
 			testName:  "Update all rows",
 			tableName: pgx.Identifier{"products"},
 			setValues: map[string]any{"color": "green"},
-			sql:       `update products set color = $1 returning *`,
+			sql:       `update "products" set "color" = $1 returning *`,
 			args:      []any{"green"},
 		},
 		{
 			testName:  "Update multiple columns",
 			tableName: pgx.Identifier{"products"},
 			setValues: map[string]any{"color": "green", "size": "large"},
-			sql:       `update products set color = $1, size = $2 returning *`,
+			sql:       `update "products" set "color" = $1, "size" = $2 returning *`,
 			args:      []any{"green", "large"},
 		},
 		{
 			testName:  "Schema qualified table",
 			tableName: pgx.Identifier{"store", "products"},
 			setValues: map[string]any{"color": "green"},
-			sql:       `update "store"."products" set color = $1 returning *`,
+			sql:       `update "store"."products" set "color" = $1 returning *`,
 			args:      []any{"green"},
 		},
 		{
 			testName:  "Table with special characters",
 			tableName: pgx.Identifier{"for sale products"},
 			setValues: map[string]any{"color": "green"},
-			sql:       `update "for sale products" set color = $1 returning *`,
+			sql:       `update "for sale products" set "color" = $1 returning *`,
 			args:      []any{"green"},
 		},
 		{
 			testName:  "Column with special characters",
 			tableName: pgx.Identifier{"products"},
 			setValues: map[string]any{"color": "green", "American size": "large"},
-			sql:       `update products set "American size" = $1, color = $2 returning *`,
+			sql:       `update "products" set "American size" = $1, "color" = $2 returning *`,
 			args:      []any{"large", "green"},
 		},
 		{
@@ -655,7 +617,7 @@ func TestUpdateSQL(t *testing.T) {
 			tableName:   pgx.Identifier{"products"},
 			setValues:   map[string]any{"color": "green"},
 			whereValues: map[string]any{"color": "red"},
-			sql:         `update products set color = $1 where color = $2 returning *`,
+			sql:         `update "products" set "color" = $1 where "color" = $2 returning *`,
 			args:        []any{"green", "red"},
 		},
 	}

@@ -557,13 +557,7 @@ func InsertRowReturning[T any](ctx context.Context, db DB, tableName pgx.Identif
 }
 
 func sanitizeIdentifier(s string) string {
-	for _, r := range s {
-		if !((r >= '0' && r <= '9') || (r >= 'a' && r <= 'z') || r == '_') {
-			return pgx.Identifier{s}.Sanitize()
-		}
-	}
-
-	return s
+	return pgx.Identifier{s}.Sanitize()
 }
 
 func insertRowSQL(tableName pgx.Identifier, values map[string]any, returningClause string) (sql string, args []any) {
