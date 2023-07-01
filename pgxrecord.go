@@ -33,6 +33,10 @@ type Table struct {
 	Name    pgx.Identifier
 	Columns []*Column
 
+	// Normalize is called before a record is saved. It is useful for normalizing data before it is saved. For example,
+	// it can be used to trim strings. If Normalize returns an error then the save is aborted.
+	Normalize func(ctx context.Context, db DB, table *Table, record *Record) error
+
 	finalized           bool
 	quotedQualifiedName string
 	quotedName          string
@@ -331,6 +335,13 @@ func (r *Record) Attributes() map[string]any {
 
 // Save saves the record using db.
 func (r *Record) Save(ctx context.Context, db DB) error {
+	if fn := r.table.Normalize; fn != nil {
+		err := fn(ctx, db, r.table, r)
+		if err != nil {
+			return fmt.Errorf("pgxrecord.Record (%s): Save: %w", r.table.quotedQualifiedName, err)
+		}
+	}
+
 	var sql string
 	var args []any
 
