@@ -28,7 +28,7 @@ type Column struct {
 	PrimaryKey bool
 }
 
-// Table represents a table in a database. It must not be mutated after Finalize is called.
+// Table represents a table in a database. It must not be mutated after any method other than LoadAllColumns is called.
 type Table struct {
 	Name    pgx.Identifier
 	Columns []*Column
@@ -52,10 +52,11 @@ type Record struct {
 	assigned           []bool
 }
 
-// LoadAllColumns queries the database for the table columns. It must not be called after Finalize.
+// LoadAllColumns queries the database for the table columns. It must not be called after any other method has been
+// called.
 func (t *Table) LoadAllColumns(ctx context.Context, db DB) error {
 	if t.finalized {
-		panic("cannot call after table finalized")
+		return fmt.Errorf("cannot call after table finalized")
 	}
 
 	var tableOID uint32
@@ -112,8 +113,8 @@ func (t *Table) LoadAllColumns(ctx context.Context, db DB) error {
 	return nil
 }
 
-// Finalize finishes the table initialization.
-func (t *Table) Finalize() {
+// finalize finishes the table initialization.
+func (t *Table) finalize() {
 	if t.finalized {
 		panic("cannot call after table finalized")
 	}
@@ -208,10 +209,10 @@ func buildNameToColumnIndex(columns []*Column) map[string]int {
 	return m
 }
 
-// NewRecord creates an empty Record. It must be called after Finalize.
+// NewRecord creates an empty Record.
 func (t *Table) NewRecord() *Record {
 	if !t.finalized {
-		panic("cannot call until table finalized")
+		t.finalize()
 	}
 
 	record := &Record{
@@ -223,19 +224,19 @@ func (t *Table) NewRecord() *Record {
 	return record
 }
 
-// SelectQuery returns the SQL query to select all rows from the table. It must be called after Finalize.
+// SelectQuery returns the SQL query to select all rows from the table.
 func (t *Table) SelectQuery() string {
 	if !t.finalized {
-		panic("cannot call until table finalized")
+		t.finalize()
 	}
 
 	return t.selectQuery
 }
 
-// FindByPK finds a record by primary key. It must be called after Finalize.
+// FindByPK finds a record by primary key.
 func (t *Table) FindByPK(ctx context.Context, db DB, pk ...any) (*Record, error) {
 	if !t.finalized {
-		panic("cannot call until table finalized")
+		t.finalize()
 	}
 
 	rows, _ := db.Query(ctx, t.selectByPKQuery, pk...)
@@ -247,10 +248,10 @@ func (t *Table) FindByPK(ctx context.Context, db DB, pk ...any) (*Record, error)
 	return record, nil
 }
 
-// RowToRecord is a pgx.RowToFunc that returns a *Record. It must be called after Finalize.
+// RowToRecord is a pgx.RowToFunc that returns a *Record.
 func (t *Table) RowToRecord(row pgx.CollectableRow) (*Record, error) {
 	if !t.finalized {
-		panic("cannot call until table finalized")
+		t.finalize()
 	}
 
 	record := t.NewRecord()
