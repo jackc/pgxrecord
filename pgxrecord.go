@@ -116,7 +116,7 @@ func (t *Table) LoadAllColumns(ctx context.Context, db DB) error {
 // finalize finishes the table initialization.
 func (t *Table) finalize() {
 	if t.finalized {
-		panic("cannot call after table finalized")
+		panic("BUG: cannot call after table finalized")
 	}
 
 	t.finalized = true
