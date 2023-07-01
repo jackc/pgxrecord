@@ -271,48 +271,40 @@ func (t *Table) RowToRecord(row pgx.CollectableRow) (*Record, error) {
 	return record, nil
 }
 
-// Set sets a attribute to a value.
-func (r *Record) Set(attribute string, value any) error {
+// Set sets an attribute to a value. It panics if attribute does not exist.
+func (r *Record) Set(attribute string, value any) {
 	idx, ok := r.table.nameToColumnIndex[attribute]
 	if !ok {
-		return fmt.Errorf("pgxrecord.Record (%s): Set: attribute %q is not found", r.table.quotedQualifiedName, attribute)
+		panic(fmt.Sprintf("pgxrecord.Record (%s): Set: attribute %q is not found", r.table.quotedQualifiedName, attribute))
 	}
 
 	r.attributes[idx] = value
 	r.assigned[idx] = true
-
-	return nil
 }
 
-// MustSet sets a attribute to a value. It panics on failure.
-func (r *Record) MustSet(attribute string, value any) {
-	err := r.Set(attribute, value)
-	if err != nil {
-		panic(err.Error())
-	}
-}
-
-// Get returns the value of attribute.
-func (r *Record) Get(attribute string) (any, error) {
+// Get returns the value of attribute. It panics if attribute does not exist.
+func (r *Record) Get(attribute string) any {
 	idx, ok := r.table.nameToColumnIndex[attribute]
 	if !ok {
-		return nil, fmt.Errorf("pgxrecord.Record (%s): Get: attribute %q is not found", r.table.quotedQualifiedName, attribute)
+		panic(fmt.Sprintf("pgxrecord.Record (%s): Get: attribute %q is not found", r.table.quotedQualifiedName, attribute))
 	}
 
-	return r.attributes[idx], nil
+	return r.attributes[idx]
 }
 
-// MustGet returns the value of attribute. It panics on failure.
-func (r *Record) MustGet(attribute string) any {
-	value, err := r.Get(attribute)
-	if err != nil {
-		panic(err.Error())
+// SetAttributes sets attributes. Ignores attributes that do not exist.
+func (r *Record) SetAttributes(attributes map[string]any) {
+	for k, v := range attributes {
+		idx, ok := r.table.nameToColumnIndex[k]
+		if ok {
+			r.attributes[idx] = v
+			r.assigned[idx] = true
+		}
 	}
-	return value
 }
 
-// SetAttributes sets attributes.
-func (r *Record) SetAttributes(attributes map[string]any) error {
+// SetAttributesStrict sets attributes. Returns an error if any attributes do not exist.
+func (r *Record) SetAttributesStrict(attributes map[string]any) error {
 	for k, v := range attributes {
 		idx, ok := r.table.nameToColumnIndex[k]
 		if !ok {

@@ -100,7 +100,8 @@ func TestTableNewRecord(t *testing.T) {
 		record := table.NewRecord()
 		require.Equal(t, map[string]any{"id": nil, "name": nil, "age": nil}, record.Attributes())
 
-		record.SetAttributes(map[string]any{"name": "John", "age": 42})
+		err = record.SetAttributesStrict(map[string]any{"name": "John", "age": 42})
+		require.NoError(t, err)
 		require.Equal(t, map[string]any{"id": nil, "name": "John", "age": 42}, record.Attributes())
 	})
 }
@@ -153,11 +154,8 @@ func TestRecordSetAndGet(t *testing.T) {
 
 		record := table.NewRecord()
 
-		err = record.Set("name", "John")
-		require.NoError(t, err)
-
-		name, err := record.Get("name")
-		require.NoError(t, err)
+		record.Set("name", "John")
+		name := record.Get("name")
 		require.Equal(t, "John", name)
 	})
 }
@@ -181,7 +179,8 @@ func TestRecordSaveInsert(t *testing.T) {
 		table.Finalize()
 
 		record := table.NewRecord()
-		record.SetAttributes(map[string]any{"name": "John", "age": 42})
+		err = record.SetAttributesStrict(map[string]any{"name": "John", "age": 42})
+		require.NoError(t, err)
 		err = record.Save(ctx, conn)
 		require.NoError(t, err)
 
@@ -215,13 +214,35 @@ func TestRecordSaveUpdate(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, map[string]any{"id": int32(1), "name": "John", "age": int32(42)}, record.Attributes())
 
-		record.MustSet("name", "Bill")
+		record.Set("name", "Bill")
 		err = record.Save(ctx, conn)
 		require.NoError(t, err)
 
 		record, err = table.FindByPK(ctx, conn, id)
 		require.NoError(t, err)
 		require.Equal(t, map[string]any{"id": int32(1), "name": "Bill", "age": int32(42)}, record.Attributes())
+	})
+}
+
+func TestRecordUpdateAttributes(t *testing.T) {
+	t.Parallel()
+
+	defaultConnTestRunner.RunTest(context.Background(), t, func(ctx context.Context, t testing.TB, conn *pgx.Conn) {
+		table := &pgxrecord.Table{
+			Name: pgx.Identifier{"t"},
+			Columns: []*pgxrecord.Column{
+				{Name: "id", OID: pgtype.Int4OID, NotNull: true, PrimaryKey: true},
+				{Name: "name", OID: pgtype.TextOID, NotNull: true, PrimaryKey: false},
+				{Name: "age", OID: pgtype.Int4OID, NotNull: false, PrimaryKey: false},
+			},
+		}
+		table.Finalize()
+
+		record := table.NewRecord()
+		require.Equal(t, map[string]any{"id": nil, "name": nil, "age": nil}, record.Attributes())
+
+		record.SetAttributes(map[string]any{"name": "John", "age": 42, "ignore": "me"})
+		require.Equal(t, map[string]any{"id": nil, "name": "John", "age": 42}, record.Attributes())
 	})
 }
 
