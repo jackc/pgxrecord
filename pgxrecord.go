@@ -3,6 +3,7 @@ package pgxrecord
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sort"
 	"strconv"
@@ -37,6 +38,11 @@ type Table struct {
 	// it can be used to trim strings. If Normalize returns an error then the save is aborted.
 	Normalize func(ctx context.Context, db DB, table *Table, record *Record) error
 
+	// Validate is called before a record is saved. If Validate returns an error then the save is aborted. A
+	// *ValidationErrors should be returned if validation fails. Any other error indicates an error occurred while
+	// validating. For example, a database query for a uniqueness check failed because of a broken database connection.
+	Validate func(ctx context.Context, db DB, table *Table, record *Record) error
+
 	finalized           bool
 	quotedQualifiedName string
 	quotedName          string
@@ -46,6 +52,7 @@ type Table struct {
 	returningClause     string
 	pkIndexes           []int
 	nameToColumnIndex   map[string]int
+	validationErrors    *ValidationErrors
 }
 
 // Record represents a row from a table in the database.
@@ -335,9 +342,22 @@ func (r *Record) Attributes() map[string]any {
 
 // Save saves the record using db.
 func (r *Record) Save(ctx context.Context, db DB) error {
+	r.table.validationErrors = nil
+
 	if fn := r.table.Normalize; fn != nil {
 		err := fn(ctx, db, r.table, r)
 		if err != nil {
+			return fmt.Errorf("pgxrecord.Record (%s): Save: %w", r.table.quotedQualifiedName, err)
+		}
+	}
+
+	if fn := r.table.Validate; fn != nil {
+		err := fn(ctx, db, r.table, r)
+		if err != nil {
+			var ve *ValidationErrors
+			if errors.As(err, &ve) {
+				r.table.validationErrors = ve
+			}
 			return fmt.Errorf("pgxrecord.Record (%s): Save: %w", r.table.quotedQualifiedName, err)
 		}
 	}
@@ -440,6 +460,10 @@ func (r *Record) update(ctx context.Context, db DB) (string, []any) {
 	b.WriteString(r.table.returningClause)
 
 	return b.String(), args
+}
+
+func (r *Record) Errors() *ValidationErrors {
+	return r.table.validationErrors
 }
 
 // Select executes sql with args on db and returns the []T produced by scanFn.
