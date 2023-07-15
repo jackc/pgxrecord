@@ -98,3 +98,45 @@ func (ve *ValidationErrors) Error() string {
 
 	return sb.String()
 }
+
+type GetterSetter interface {
+	Get(attribute string) any
+	Set(attribute string, value any)
+}
+
+type RecordValidator struct {
+	record GetterSetter
+	errors *ValidationErrors
+}
+
+func (v *RecordValidator) Validate(field string, validators ...ValueValidator) {
+	value := v.record.Get(field)
+	for _, validator := range validators {
+		var err error
+		value, err = validator.Validate(value)
+		if err != nil {
+			v.errors.Add(field, err)
+			return
+		}
+	}
+	v.record.Set(field, value)
+}
+
+type ValueValidator interface {
+	Validate(any) (any, error)
+}
+
+// type RecordValidator interface {
+// 	ValidateRecord(ctx context.Context, db DB, table *Table, record *Record) error
+// }
+
+// type RecordValidatorBuilder struct {
+// 	ctx    context.Context
+// 	db     DB
+// 	table  *Table
+// 	record *Record
+// }
+
+// func NewRecordValidatorBuilder(fn func(rvb *RecordValidatorBuilder)) RecordValidator {
+
+// }
